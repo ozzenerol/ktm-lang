@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Generics - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html" class="on"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li></ol></aside>
+  <article class="prose">
+<h1>Generics</h1>
+<p>Functions, structs and methods can take type parameters: one definition, written once, used with many types. Each use is compiled for its types, producing the same code you would write by hand, with no <code>void *</code> and no casts. This chapter covers generic functions, how the types are worked out at a call, generic structs and their methods, methods with type parameters of their own, generic bases, the library's generic containers, and the errors generics give.</p>
+<h2 id="generic-functions"><a href="#generic-functions">Generic functions</a></h2>
+<p>Type parameters go in <code>&lt;...&gt;</code> after the function's name; they can be used anywhere a type can in the parameters, the return type and the body.</p>
+<pre class="code run"><code>T max&lt;T&gt;(T a, T b) {
+    <span class="k">return</span> a &gt; b ? a : b;
+}
+
+<span class="t">i32</span> main() {
+    printf(<span class="s">&quot;%d\n&quot;</span>, max(<span class="n">3</span>, <span class="n">7</span>));
+    printf(<span class="s">&quot;%.1f\n&quot;</span>, max(<span class="n">1.5</span>, <span class="n">0.5</span>));
+    printf(<span class="s">&quot;%c\n&quot;</span>, max(<span class="s">&#x27;a&#x27;</span>, <span class="s">&#x27;z&#x27;</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>7
+1.5
+z</code></pre>
+<p>Each type <code>max</code> is called with gets its own compiled copy, an instance: <code>max&lt;i64&gt;</code>, <code>max&lt;f64&gt;</code> and <code>max&lt;u8&gt;</code> above. They are as fast as three hand-written functions.</p>
+<p>A generic function can take pointers to its type parameter:</p>
+<pre class="code run"><code><span class="t">void</span> swap&lt;T&gt;(T *a, T *b) {
+    T t = *a;
+    *a = *b;
+    *b = t;
+}
+
+<span class="t">i32</span> main() {
+    <span class="t">i64</span> x = <span class="n">1</span>, y = <span class="n">2</span>;
+    swap(&amp;x, &amp;y);
+    <span class="t">u8</span> *s = <span class="s">&quot;left&quot;</span>, *t = <span class="s">&quot;right&quot;</span>;
+    swap(&amp;s, &amp;t);
+    printf(<span class="s">&quot;%d %d %s %s\n&quot;</span>, x, y, s, t);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>2 1 right left</code></pre>
+<p>And slices of it:</p>
+<pre class="code run"><code>T sum&lt;T&gt;(T[] xs) {
+    T total = <span class="n">0</span>;
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; xs.len; i++) {
+        total += xs[i];
+    }
+    <span class="k">return</span> total;
+}
+
+<span class="t">i32</span> main() {
+    <span class="t">i64</span> ints[<span class="n">3</span>] = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>};
+    <span class="t">f64</span> floats[<span class="n">2</span>] = {<span class="n">0.5</span>, <span class="n">0.25</span>};
+    printf(<span class="s">&quot;%d %.2f\n&quot;</span>, sum(ints), sum(floats));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>6 0.75</code></pre>
+<p>Several type parameters are separated by commas:</p>
+<pre class="code run"><code>B convert&lt;A, B&gt;(A a, fn(A) B f) {
+    <span class="k">return</span> f(a);
+}
+
+<span class="t">f64</span> half(<span class="t">i64</span> x) {
+    <span class="k">return</span> (<span class="t">f64</span>)x / <span class="n">2.0</span>;
+}
+
+<span class="t">i32</span> main() {
+    printf(<span class="s">&quot;%.1f\n&quot;</span>, convert(<span class="n">7</span>, &amp;half));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>3.5</code></pre>
+<h2 id="working-out-the-types"><a href="#working-out-the-types">Working out the types</a></h2>
+<p>At a call, ktm works the type parameters out from the arguments: through plain values, pointers, slices, <code>fn</code> types and generic structs. When the arguments disagree, or don't mention a parameter at all, write the types after the name:</p>
+<pre class="code run"><code>T max&lt;T&gt;(T a, T b) {
+    <span class="k">return</span> a &gt; b ? a : b;
+}
+
+<span class="t">i32</span> main() {
+    printf(<span class="s">&quot;%.1f\n&quot;</span>, max&lt;<span class="t">f64</span>&gt;(<span class="n">1</span>, <span class="n">2.5</span>));
+    printf(<span class="s">&quot;%d\n&quot;</span>, max&lt;<span class="t">i64</span>&gt;(-<span class="n">3</span>, <span class="n">2</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>2.5
+2</code></pre>
+<p>With <code>max&lt;f64&gt;</code>, the <code>1</code> becomes <code>1.0</code>, as for any <code>f64</code> parameter. A type parameter that only appears in the return type has to be written, since no argument says what it is:</p>
+<pre class="code run"><code>T zero&lt;T&gt;() {
+    T z;
+    <span class="k">return</span> z;
+}
+
+<span class="t">i32</span> main() {
+    <span class="t">i64</span> n = zero&lt;<span class="t">i64</span>&gt;();
+    <span class="t">f64</span> f = zero&lt;<span class="t">f64</span>&gt;();
+    printf(<span class="s">&quot;%d %.1f\n&quot;</span>, n, f);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>0 0.0</code></pre>
+<pre class="code bad"><span class="tag">does not compile</span><code>T zero&lt;T&gt;() {
+    T z;
+    <span class="k">return</span> z;
+}
+
+<span class="t">i32</span> main() {
+    <span class="t">i64</span> n = zero();
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>can&#x27;t work out the type arguments of `zero`: nothing says what `T` is</code></pre>
+<h2 id="generic-structs"><a href="#generic-structs">Generic structs</a></h2>
+<p>A struct can take type parameters too. The type is always written with its arguments, nested ones included: <code>Pair&lt;u8 *, f64&gt;</code>, <code>Stack&lt;Stack&lt;i64&gt;&gt;</code>.</p>
+<pre class="code run"><code><span class="k">struct</span> Pair&lt;K, V&gt; {
+    K key;
+    V value;
+};
+
+<span class="t">i32</span> main() {
+    Pair&lt;<span class="t">u8</span> *, <span class="t">f64</span>&gt; pi = {<span class="s">&quot;pi&quot;</span>, <span class="n">3.14</span>};
+    Pair&lt;<span class="t">i64</span>, <span class="t">bool</span>&gt; flag = {<span class="n">7</span>, <span class="k">true</span>};
+    printf(<span class="s">&quot;%s=%.2f %d=%d\n&quot;</span>, pi.key, pi.value, flag.key, flag.value);
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, <span class="k">sizeof</span>(Pair&lt;<span class="t">u8</span> *, <span class="t">f64</span>&gt;), <span class="k">sizeof</span>(Pair&lt;<span class="t">u8</span>, <span class="t">u8</span>&gt;));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>pi=3.14 7=1
+16 2</code></pre>
+<p>Each set of arguments is its own struct type, laid out for its types: <code>Pair&lt;u8, u8&gt;</code> is 2 bytes.</p>
+<p>A generic function can make and return one; <code>auto</code> keeps the full type:</p>
+<pre class="code run"><code><span class="k">struct</span> Pair&lt;K, V&gt; {
+    K key;
+    V value;
+};
+
+Pair&lt;K, V&gt; pairOf&lt;K, V&gt;(K k, V v) {
+    Pair&lt;K, V&gt; p = {k, v};
+    <span class="k">return</span> p;
+}
+
+<span class="t">i32</span> main() {
+    <span class="k">auto</span> e = pairOf(<span class="s">&quot;e&quot;</span>, <span class="n">2.72</span>);
+    printf(<span class="s">&quot;%s=%.2f\n&quot;</span>, e.key, e.value);
+    printf(<span class="s">&quot;%s\n&quot;</span>, <span class="k">typeof</span>(e));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>e=2.72
+Pair&lt;u8 *, f64&gt;</code></pre>
+<p><code>typeof(x)</code> is the type of <code>x</code> as text, which helps to see what an instance is.</p>
+<p>A generic struct can hold another generic struct:</p>
+<pre class="code run"><code><span class="k">struct</span> Box&lt;T&gt; {
+    T value;
+};
+
+<span class="k">struct</span> Shelf&lt;T&gt; {
+    Box&lt;T&gt; left;
+    Box&lt;T&gt; right;
+};
+
+<span class="t">i32</span> main() {
+    Shelf&lt;<span class="t">i64</span>&gt; s = {{<span class="n">1</span>}, {<span class="n">2</span>}};
+    Box&lt;Box&lt;<span class="t">u8</span> *&gt;&gt; nested = {{<span class="s">&quot;deep&quot;</span>}};
+    printf(<span class="s">&quot;%d %d %s\n&quot;</span>, s.left.value, s.right.value, nested.value.value);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>1 2 deep</code></pre>
+<h2 id="methods-of-a-generic-struct"><a href="#methods-of-a-generic-struct">Methods of a generic struct</a></h2>
+<p>A method of a generic struct is written with the struct's type parameters after its name, <code>Stack&lt;T&gt;.push</code>; inside, <code>T</code> is whatever the instance's <code>T</code> is.</p>
+<pre class="code run"><code><span class="k">import</span> mem;
+
+<span class="k">struct</span> Stack&lt;T&gt; {
+    T *items;
+    <span class="t">i64</span> len;
+    <span class="t">i64</span> cap;
+};
+
+<span class="t">void</span> Stack&lt;T&gt;.push(T x) {
+    <span class="k">if</span> (self.len == self.cap) {
+        self.cap = self.cap ? self.cap * <span class="n">2</span> : <span class="n">4</span>;
+        self.items = mem.realloc(self.items, <span class="k">sizeof</span>(T) * self.cap);
+    }
+    self.items[self.len++] = x;
+}
+
+T Stack&lt;T&gt;.pop() {
+    <span class="k">return</span> self.items[--self.len];
+}
+
+<span class="t">bool</span> Stack&lt;T&gt;.empty() {
+    <span class="k">return</span> self.len == <span class="n">0</span>;
+}
+
+<span class="t">void</span> Stack&lt;T&gt;.free() {
+    mem.free(self.items);
+}
+
+<span class="t">i32</span> main() {
+    <span class="k">ad</span> Stack&lt;<span class="t">i64</span>&gt; nums;
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">1</span>; i &lt;= <span class="n">5</span>; i++) {
+        nums.push(i * i);
+    }
+    <span class="k">while</span> (!nums.empty()) {
+        printf(<span class="s">&quot;%d &quot;</span>, nums.pop());
+    }
+    printf(<span class="s">&quot;\n&quot;</span>);
+    <span class="k">ad</span> Stack&lt;<span class="t">u8</span> *&gt; words;
+    words.push(<span class="s">&quot;first&quot;</span>);
+    words.push(<span class="s">&quot;second&quot;</span>);
+    printf(<span class="s">&quot;%s\n&quot;</span>, words.pop());
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>25 16 9 4 1 
+second</code></pre>
+<p>Only the methods an instance uses are compiled for it.</p>
+<h2 id="methods-with-type-parameters-of-their-own"><a href="#methods-with-type-parameters-of-their-own">Methods with type parameters of their own</a></h2>
+<p>A method can have type parameters of its own, after its name as for a function. It works on a plain struct, and on a generic one next to the struct's parameters:</p>
+<pre class="code run"><code><span class="k">struct</span> Counter { <span class="t">i64</span> n; };
+
+<span class="t">i64</span> Counter.addAll&lt;V&gt;(V[] xs) {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; xs.len; i++) {
+        self.n += (<span class="t">i64</span>)xs[i];
+    }
+    <span class="k">return</span> self.n;
+}
+
+<span class="t">i32</span> main() {
+    Counter c = {<span class="n">0</span>};
+    <span class="t">u8</span> bytes[<span class="n">3</span>] = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>};
+    <span class="t">f64</span> floats[<span class="n">2</span>] = {<span class="n">1.5</span>, <span class="n">2.5</span>};
+    printf(<span class="s">&quot;%d\n&quot;</span>, c.addAll(bytes));
+    printf(<span class="s">&quot;%d\n&quot;</span>, c.addAll(floats));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>6
+9</code></pre>
+<p>On a generic struct, a method can map one instance to another:</p>
+<pre class="code run"><code><span class="k">struct</span> Pair&lt;T&gt; {
+    T a;
+    T b;
+};
+
+Pair&lt;U&gt; Pair&lt;T&gt;.map&lt;U&gt;(fn(T) U f) {
+    Pair&lt;U&gt; p = {f(self.a), f(self.b)};
+    <span class="k">return</span> p;
+}
+
+<span class="t">f64</span> half(<span class="t">i64</span> x) {
+    <span class="k">return</span> (<span class="t">f64</span>)x / <span class="n">2.0</span>;
+}
+
+<span class="t">u8</span> *size(<span class="t">f64</span> x) {
+    <span class="k">return</span> x &gt;= <span class="n">1.0</span> ? <span class="s">&quot;big&quot;</span> : <span class="s">&quot;small&quot;</span>;
+}
+
+<span class="t">i32</span> main() {
+    Pair&lt;<span class="t">i64</span>&gt; p = {<span class="n">1</span>, <span class="n">5</span>};
+    Pair&lt;<span class="t">u8</span> *&gt; s = p.map(&amp;half).map(&amp;size);
+    printf(<span class="s">&quot;%s %s\n&quot;</span>, s.a, s.b);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>small big</code></pre>
+<ul><li>The method's own parameters are worked out from its arguments, as for a function; <code>self</code> takes no part, and the struct's parameters come from the value it is called on.</li><li>Write them when nothing says what they are: <code>c.zero&lt;i64&gt;()</code> for a method whose type parameter is only in its return type.</li><li>Its own parameter names can't repeat the struct's: <code>Pair&lt;T&gt;.f&lt;T&gt;</code> is an error.</li><li>Its name is its own: not a field's, not a plain method's, not another generic method's.</li></ul>
+<h2 id="generic-functions-over-generic-structs"><a href="#generic-functions-over-generic-structs">Generic functions over generic structs</a></h2>
+<p>A function can take a generic struct and work out its parameters from it:</p>
+<pre class="code run"><code><span class="k">struct</span> Box&lt;T&gt; {
+    T value;
+};
+
+T unbox&lt;T&gt;(Box&lt;T&gt; *b) {
+    <span class="k">return</span> b.value;
+}
+
+<span class="t">void</span> fill&lt;T&gt;(Box&lt;T&gt; *b, T v) {
+    b.value = v;
+}
+
+<span class="t">i32</span> main() {
+    Box&lt;<span class="t">f64</span>&gt; b = {<span class="n">2.5</span>};
+    Box&lt;<span class="t">u8</span> *&gt; s;
+    fill(&amp;s, <span class="s">&quot;packed&quot;</span>);
+    printf(<span class="s">&quot;%.1f %s\n&quot;</span>, unbox(&amp;b), unbox(&amp;s));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>2.5 packed</code></pre>
+<h2 id="a-generic-base"><a href="#a-generic-base">A generic base</a></h2>
+<p>A generic struct can extend another, generic or not, and get its methods (see <a href="13-methods.html">Methods</a>):</p>
+<pre class="code run"><code><span class="k">struct</span> List&lt;T&gt; {
+    T items[<span class="n">4</span>];
+    <span class="t">i64</span> len;
+};
+
+<span class="k">struct</span> Counted&lt;T&gt; : List&lt;T&gt; {
+    <span class="t">i64</span> adds;
+};
+
+<span class="t">void</span> List&lt;T&gt;.add(T x) {
+    self.items[self.len++] = x;
+}
+
+<span class="t">void</span> Counted&lt;T&gt;.addCounted(T x) {
+    self.add(x);
+    self.adds++;
+}
+
+<span class="t">i32</span> main() {
+    Counted&lt;<span class="t">i64</span>&gt; c;
+    c.addCounted(<span class="n">10</span>);
+    c.addCounted(<span class="n">20</span>);
+    printf(<span class="s">&quot;%d %d %d %d\n&quot;</span>, c.len, c.items[<span class="n">0</span>], c.items[<span class="n">1</span>], c.adds);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>2 10 20 2</code></pre>
+<h2 id="the-library-s-generic-containers"><a href="#the-library-s-generic-containers">The library's generic containers</a></h2>
+<p>The containers are generic: <code>vec.Vec&lt;T&gt;</code>, <code>map.Map&lt;K, V&gt;</code>, <code>set.Set&lt;T&gt;</code>, <code>list.List&lt;T&gt;</code> (see <a href="../std/index.html#vec">the library</a>). Their constructors take the types:</p>
+<pre class="code run"><code><span class="k">import</span> map, vec;
+
+<span class="t">i32</span> main() {
+    <span class="k">ad</span> vec.Vec&lt;<span class="t">u8</span> *&gt; names = vec.new&lt;<span class="t">u8</span> *&gt;();
+    names.push(<span class="s">&quot;ann&quot;</span>);
+    names.push(<span class="s">&quot;bob&quot;</span>);
+    <span class="k">ad</span> map.Map&lt;<span class="t">u8</span> *, <span class="t">i64</span>&gt; ages = map.new&lt;<span class="t">u8</span> *, <span class="t">i64</span>&gt;();
+    ages.set(<span class="s">&quot;ann&quot;</span>, <span class="n">41</span>);
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; names.len; i++) {
+        <span class="t">u8</span> *n = names.get(i);
+        printf(<span class="s">&quot;%s %d\n&quot;</span>, n, ages.getOr(n, -<span class="n">1</span>));
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>ann 41
+bob -1</code></pre>
+<p><code>json.decode&lt;T&gt;</code> is generic too: it decodes into whatever struct <code>T</code> is (see <a href="23-attributes.html">Attributes</a>).</p>
+<h2 id="errors-are-checked-per-instance"><a href="#errors-are-checked-per-instance">Errors are checked per instance</a></h2>
+<p>A generic body is checked for each set of types it is used with. A body that works for numbers fails for a struct, at the operator that doesn't apply, with a note naming the instance and the call that asked for it:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+
+T max&lt;T&gt;(T a, T b) {
+    <span class="k">return</span> a &gt; b ? a : b;
+}
+
+<span class="t">i32</span> main() {
+    Point a = {<span class="n">1</span>, <span class="n">2</span>};
+    Point b = {<span class="n">3</span>, <span class="n">4</span>};
+    max(a, b);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>max&lt;Point&gt;</code></pre>
+<p>There are no constraints on type parameters: the instance either compiles or doesn't.</p>
+<h2 id="in-modules-and-libraries"><a href="#in-modules-and-libraries">In modules and libraries</a></h2>
+<p>A generic declared <code>pub</code> in a module is used as <code>module.name</code>, like any declaration: <code>coll.Stack&lt;i64&gt;</code>, <code>coll.pairOf(1, 2)</code> (see <a href="22-modules-and-packages.html">Modules and packages</a>). A library built with <code>ktm -lib</code> keeps its generics as source, and each program compiles the instances it uses.</p>
+<h2 id="not-in-ktm"><a href="#not-in-ktm">Not in ktm</a></h2>
+<ul><li>Constraints on type parameters.</li><li>Generic enums, and numbers as parameters (<code>Array&lt;T, 16&gt;</code>).</li><li>A different body for one type (specialisation).</li><li>Several generic methods of one name, or a generic method next to a plain one of its name.</li><li>The address of a generic method: wrap the call in a function.</li></ul>
+<h2 id="rules"><a href="#rules">Rules</a></h2>
+<ul><li><code>T name&lt;T&gt;(...)</code> is a generic function; <code>struct Name&lt;T&gt; { ... }</code> a generic struct; <code>R Name&lt;T&gt;.method(...)</code> a method of one; <code>R Name.method&lt;U&gt;(...)</code> a method with its own type parameters.</li><li>Each set of type arguments is compiled into its own instance, when first used.</li><li>A call works the types out from the arguments; write <code>f&lt;T&gt;(...)</code> when it can't.</li><li>A generic struct type is always written with its arguments.</li><li>The body is checked per instance; there are no constraints.</li></ul>
+    <nav class="pager"><a class="prev" href="16-defer-and-ad.html"><span>Previous</span>defer and ad</a><a class="next" href="18-overloading.html"><span>Next</span>Overloading</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#generic-functions">Generic functions</a></li><li><a href="#working-out-the-types">Working out the types</a></li><li><a href="#generic-structs">Generic structs</a></li><li><a href="#methods-of-a-generic-struct">Methods of a generic struct</a></li><li><a href="#methods-with-type-parameters-of-their-own">Methods with type parameters of their own</a></li><li><a href="#generic-functions-over-generic-structs">Generic functions over generic structs</a></li><li><a href="#a-generic-base">A generic base</a></li><li><a href="#the-library-s-generic-containers">The library&#x27;s generic containers</a></li><li><a href="#errors-are-checked-per-instance">Errors are checked per instance</a></li><li><a href="#in-modules-and-libraries">In modules and libraries</a></li><li><a href="#not-in-ktm">Not in ktm</a></li><li><a href="#rules">Rules</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>

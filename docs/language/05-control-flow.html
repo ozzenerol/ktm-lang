@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Control flow - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html" class="on"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li></ol></aside>
+  <article class="prose">
+<h1>Control flow</h1>
+<p><code>if</code> and <code>else</code>, the three loops, the range-based <code>for</code>, <code>break</code> and <code>continue</code>, and <code>goto</code>. <a href="06-switch.html">switch</a> has its own chapter.</p>
+<h2 id="braces-are-required"><a href="#braces-are-required">Braces are required</a></h2>
+<p>The body of <code>if</code>, <code>else</code>, <code>for</code>, <code>while</code> and <code>do</code> is always a block in braces, even when it is one statement. <code>else if</code> is the one exception. This rules out a whole class of bugs where a second line looks guarded but isn't.</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">void</span> main() {
+    <span class="t">i64</span> x = <span class="n">1</span>;
+    <span class="k">if</span> (x) x = <span class="n">2</span>;
+}</code></pre>
+<pre class="out"><code>braces required: the body of `if` goes in `{ ... }`</code></pre>
+<h2 id="parentheses-are-optional"><a href="#parentheses-are-optional">Parentheses are optional</a></h2>
+<p>The condition can be written in parentheses, as in C, or without them, as in Go. Both mean the same, and one program can mix them. Without parentheses, the condition runs up to the <code>{</code>.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> a = <span class="n">1</span>, b = <span class="n">2</span>;
+    <span class="k">if</span> (a &lt; b) {
+        printf(<span class="s">&quot;with parentheses\n&quot;</span>);
+    }
+    <span class="k">if</span> a &lt; b {
+        printf(<span class="s">&quot;without them\n&quot;</span>);
+    }
+    <span class="k">if</span> (a + b) * <span class="n">2</span> &gt; <span class="n">5</span> {
+        printf(<span class="s">&quot;a condition can start with a parenthesis of its own\n&quot;</span>);
+    }
+}</code></pre>
+<pre class="out"><code>with parentheses
+without them
+a condition can start with a parenthesis of its own</code></pre>
+<p>The rest of this chapter uses parentheses; every example works without them too.</p>
+<h2 id="if-and-else"><a href="#if-and-else">if and else</a></h2>
+<pre class="code run"><code><span class="t">void</span> classify(<span class="t">i64</span> n) {
+    <span class="k">if</span> (n &lt; <span class="n">0</span>) {
+        printf(<span class="s">&quot;%d is negative\n&quot;</span>, n);
+    } <span class="k">else</span> <span class="k">if</span> (n == <span class="n">0</span>) {
+        printf(<span class="s">&quot;%d is zero\n&quot;</span>, n);
+    } <span class="k">else</span> <span class="k">if</span> (n &lt; <span class="n">10</span>) {
+        printf(<span class="s">&quot;%d is small\n&quot;</span>, n);
+    } <span class="k">else</span> {
+        printf(<span class="s">&quot;%d is large\n&quot;</span>, n);
+    }
+}
+
+<span class="t">void</span> main() {
+    classify(-<span class="n">5</span>);
+    classify(<span class="n">0</span>);
+    classify(<span class="n">7</span>);
+    classify(<span class="n">100</span>);
+}</code></pre>
+<pre class="out"><code>-5 is negative
+0 is zero
+7 is small
+100 is large</code></pre>
+<p>The condition is any number or pointer: zero and <code>null</code> are false, everything else true.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">u8</span> *name = <span class="s">&quot;ktm&quot;</span>;
+    <span class="t">i64</span> count = <span class="n">0</span>;
+    <span class="k">if</span> (name) {
+        printf(<span class="s">&quot;has a name\n&quot;</span>);
+    }
+    <span class="k">if</span> (!count) {
+        printf(<span class="s">&quot;count is zero\n&quot;</span>);
+    }
+}</code></pre>
+<pre class="out"><code>has a name
+count is zero</code></pre>
+<h3 id="a-declaration-in-the-if"><a href="#a-declaration-in-the-if">A declaration in the if</a></h3>
+<p>A declaration can come before the condition, separated by <code>;</code>. It is visible in the <code>if</code> and in its <code>else</code> branches, and nowhere else.</p>
+<pre class="code run"><code><span class="t">i64</span> lookup(<span class="t">u8</span> *key) { <span class="k">return</span> key[<span class="n">0</span>] == <span class="s">&#x27;a&#x27;</span> ? <span class="n">42</span> : -<span class="n">1</span>; }
+
+<span class="t">void</span> main() {
+    <span class="k">if</span> (<span class="t">i64</span> v = lookup(<span class="s">&quot;apple&quot;</span>); v &gt;= <span class="n">0</span>) {
+        printf(<span class="s">&quot;found %d\n&quot;</span>, v);
+    } <span class="k">else</span> {
+        printf(<span class="s">&quot;missing\n&quot;</span>);
+    }
+    <span class="k">if</span> (<span class="t">i64</span> v = lookup(<span class="s">&quot;kiwi&quot;</span>); v &gt;= <span class="n">0</span>) {
+        printf(<span class="s">&quot;found %d\n&quot;</span>, v);
+    } <span class="k">else</span> {
+        printf(<span class="s">&quot;missing (v is %d)\n&quot;</span>, v);
+    }
+}</code></pre>
+<pre class="out"><code>found 42
+missing (v is -1)</code></pre>
+<p>A declaration alone is a condition too: the variable's value is tested.</p>
+<pre class="code run"><code><span class="t">u8</span> *findUser(<span class="t">i64</span> id) { <span class="k">return</span> id == <span class="n">1</span> ? <span class="s">&quot;ada&quot;</span> : <span class="k">null</span>; }
+
+<span class="t">void</span> main() {
+    <span class="k">if</span> (<span class="t">u8</span> *name = findUser(<span class="n">1</span>)) {
+        printf(<span class="s">&quot;user 1 is %s\n&quot;</span>, name);
+    }
+    <span class="k">if</span> (<span class="t">u8</span> *name = findUser(<span class="n">2</span>)) {
+        printf(<span class="s">&quot;user 2 is %s\n&quot;</span>, name);
+    } <span class="k">else</span> {
+        printf(<span class="s">&quot;no user 2\n&quot;</span>);
+    }
+}</code></pre>
+<pre class="out"><code>user 1 is ada
+no user 2</code></pre>
+<h2 id="while"><a href="#while">while</a></h2>
+<p><code>while</code> runs its body as long as the condition is true. The condition is tested before each pass, so the body may not run at all.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> n = <span class="n">27</span>, steps = <span class="n">0</span>;
+    <span class="k">while</span> (n != <span class="n">1</span>) {
+        n = n % <span class="n">2</span> == <span class="n">0</span> ? n / <span class="n">2</span> : <span class="n">3</span> * n + <span class="n">1</span>;
+        steps++;
+    }
+    printf(<span class="s">&quot;27 reaches 1 in %d steps\n&quot;</span>, steps);
+
+    <span class="t">i64</span> never = <span class="n">0</span>;
+    <span class="k">while</span> (never &gt; <span class="n">0</span>) {
+        printf(<span class="s">&quot;not printed\n&quot;</span>);
+    }
+}</code></pre>
+<pre class="out"><code>27 reaches 1 in 111 steps</code></pre>
+<h2 id="do-while"><a href="#do-while">do ... while</a></h2>
+<p><code>do</code> tests the condition after each pass, so the body runs at least once. The <code>while</code> at the end takes a <code>;</code>.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> n = <span class="n">0</span>;
+    <span class="k">do</span> {
+        printf(<span class="s">&quot;pass %d\n&quot;</span>, n);
+        n++;
+    } <span class="k">while</span> (n &lt; <span class="n">3</span>);
+
+    <span class="t">i64</span> big = <span class="n">100</span>;
+    <span class="k">do</span> {
+        printf(<span class="s">&quot;runs once, even though %d &gt;= 3\n&quot;</span>, big);
+    } <span class="k">while</span> (big &lt; <span class="n">3</span>);
+}</code></pre>
+<pre class="out"><code>pass 0
+pass 1
+pass 2
+runs once, even though 100 &gt;= 3</code></pre>
+<h2 id="for"><a href="#for">for</a></h2>
+<p>The classic three-part <code>for</code>: a start, a condition tested before each pass, and a step run after each pass. A variable declared in the start belongs to the loop.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">5</span>; i++) {
+        printf(<span class="s">&quot;%d &quot;</span>, i);
+    }
+    printf(<span class="s">&quot;\n&quot;</span>);
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">10</span>; i &gt; <span class="n">0</span>; i -= <span class="n">3</span>) {
+        printf(<span class="s">&quot;%d &quot;</span>, i);
+    }
+    printf(<span class="s">&quot;\n&quot;</span>);
+}</code></pre>
+<pre class="out"><code>0 1 2 3 4 
+10 7 4 1 </code></pre>
+<p>Each part can be left out. Several variables and several steps are separated by commas.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="k">for</span> (<span class="t">i64</span> lo = <span class="n">0</span>, hi = <span class="n">9</span>; lo &lt; hi; lo++, hi--) {
+        printf(<span class="s">&quot;(%d,%d) &quot;</span>, lo, hi);
+    }
+    printf(<span class="s">&quot;\n&quot;</span>);
+
+    <span class="t">i64</span> k = <span class="n">0</span>;
+    <span class="k">for</span> (; k &lt; <span class="n">3</span>;) {
+        k++;
+    }
+    printf(<span class="s">&quot;k = %d\n&quot;</span>, k);
+}</code></pre>
+<pre class="out"><code>(0,9) (1,8) (2,7) (3,6) (4,5) 
+k = 3</code></pre>
+<p>Without parentheses, <code>for</code> also has Go's two short forms: <code>for cond { }</code> is a <code>while</code>, and <code>for { }</code> loops until something leaves it.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> n = <span class="n">0</span>;
+    <span class="k">for</span> n &lt; <span class="n">3</span> {
+        n++;
+    }
+    <span class="k">for</span> {
+        n++;
+        <span class="k">if</span> n == <span class="n">10</span> { <span class="k">break</span>; }
+    }
+    printf(<span class="s">&quot;%d\n&quot;</span>, n);
+}</code></pre>
+<pre class="out"><code>10</code></pre>
+<h2 id="break-and-continue"><a href="#break-and-continue">break and continue</a></h2>
+<p><code>break</code> leaves the innermost loop; <code>continue</code> skips to its next pass (in a <code>for</code>, the step still runs).</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">10</span>; i++) {
+        <span class="k">if</span> (i == <span class="n">2</span>) { <span class="k">continue</span>; }
+        <span class="k">if</span> (i == <span class="n">6</span>) { <span class="k">break</span>; }
+        printf(<span class="s">&quot;%d &quot;</span>, i);
+    }
+    printf(<span class="s">&quot;\n&quot;</span>);
+}</code></pre>
+<pre class="out"><code>0 1 3 4 5 </code></pre>
+<p>In nested loops, they act on the innermost one:</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="k">for</span> (<span class="t">i64</span> row = <span class="n">0</span>; row &lt; <span class="n">3</span>; row++) {
+        <span class="k">for</span> (<span class="t">i64</span> col = <span class="n">0</span>; col &lt; <span class="n">3</span>; col++) {
+            <span class="k">if</span> (col &gt; row) { <span class="k">break</span>; }
+            printf(<span class="s">&quot;(%d,%d)&quot;</span>, row, col);
+        }
+    }
+    printf(<span class="s">&quot;\n&quot;</span>);
+}</code></pre>
+<pre class="out"><code>(0,0)(1,0)(1,1)(2,0)(2,1)(2,2)</code></pre>
+<p>To leave several loops at once, return from a function, or use <code>goto</code> (below).</p>
+<pre class="code run"><code><span class="t">bool</span> findPair(<span class="t">i64</span> *nums, <span class="t">i64</span> n, <span class="t">i64</span> target, <span class="t">i64</span> *a, <span class="t">i64</span> *b) {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; n; i++) {
+        <span class="k">for</span> (<span class="t">i64</span> j = i + <span class="n">1</span>; j &lt; n; j++) {
+            <span class="k">if</span> (nums[i] + nums[j] == target) {
+                *a = i;
+                *b = j;
+                <span class="k">return</span> <span class="k">true</span>;
+            }
+        }
+    }
+    <span class="k">return</span> <span class="k">false</span>;
+}
+
+<span class="t">void</span> main() {
+    <span class="t">i64</span> nums[] = {<span class="n">3</span>, <span class="n">8</span>, <span class="n">11</span>, <span class="n">4</span>};
+    <span class="t">i64</span> a, b;
+    <span class="k">if</span> (findPair(nums, <span class="n">4</span>, <span class="n">12</span>, &amp;a, &amp;b)) {
+        printf(<span class="s">&quot;nums[%d] + nums[%d] = 12\n&quot;</span>, a, b);
+    }
+}</code></pre>
+<pre class="out"><code>nums[1] + nums[3] = 12</code></pre>
+<h2 id="the-range-based-for"><a href="#the-range-based-for">The range-based for</a></h2>
+<p><code>for (T x : items)</code> runs once per element, in order. It works on:</p>
+<ul><li>fixed-size arrays,</li><li>slices (<code>T[]</code>), <code>String</code>s included,</li><li>any struct with <code>data</code> and <code>len</code> fields (or <code>entries</code> and <code>size</code>), such as <a href="../std/index.html#vec/vec.Vec">vec.Vec</a>.</li></ul>
+<pre class="code run"><code><span class="k">import</span> vec;
+
+<span class="t">void</span> main() {
+    <span class="t">i64</span> primes[] = {<span class="n">2</span>, <span class="n">3</span>, <span class="n">5</span>, <span class="n">7</span>, <span class="n">11</span>};
+    <span class="t">i64</span> sum = <span class="n">0</span>;
+    <span class="k">for</span> (<span class="k">auto</span> p : primes) {
+        sum += p;
+    }
+    printf(<span class="s">&quot;sum = %d\n&quot;</span>, sum);
+
+    <span class="t">u8</span>[] word = <span class="s">&quot;ktm&quot;</span>;
+    <span class="k">for</span> (<span class="t">u8</span> c : word) {
+        printf(<span class="s">&quot;[%c]&quot;</span>, c);
+    }
+    printf(<span class="s">&quot;\n&quot;</span>);
+
+    vec.Vec&lt;<span class="t">f64</span>&gt; v = vec.new&lt;<span class="t">f64</span>&gt;();
+    v.push(<span class="n">1.5</span>);
+    v.push(<span class="n">2.5</span>);
+    <span class="k">for</span> (<span class="t">f64</span> x : v) {
+        printf(<span class="s">&quot;%.1f &quot;</span>, x);
+    }
+    printf(<span class="s">&quot;\n&quot;</span>);
+    v.free();
+}</code></pre>
+<pre class="out"><code>sum = 28
+[k][t][m]
+1.5 2.5 </code></pre>
+<p>The loop variable is a copy of the element. Changing it changes nothing in the array; to change the elements, loop over the index:</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> nums[] = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>};
+    <span class="k">for</span> (<span class="k">auto</span> n : nums) {
+        n *= <span class="n">10</span>;
+    }
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, nums[<span class="n">0</span>], nums[<span class="n">1</span>], nums[<span class="n">2</span>]);
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">3</span>; i++) {
+        nums[i] *= <span class="n">10</span>;
+    }
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, nums[<span class="n">0</span>], nums[<span class="n">1</span>], nums[<span class="n">2</span>]);
+}</code></pre>
+<pre class="out"><code>1 2 3
+10 20 30</code></pre>
+<p><code>break</code> and <code>continue</code> work in a range-based <code>for</code> as in any loop:</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">u8</span>[] text = <span class="s">&quot;find the q here&quot;</span>;
+    <span class="t">i64</span> at = <span class="n">0</span>;
+    <span class="k">for</span> (<span class="t">u8</span> c : text) {
+        <span class="k">if</span> (c == <span class="s">&#x27;q&#x27;</span>) { <span class="k">break</span>; }
+        at++;
+    }
+    printf(<span class="s">&quot;q is at %d\n&quot;</span>, at);
+}</code></pre>
+<pre class="out"><code>q is at 9</code></pre>
+<h2 id="goto"><a href="#goto">goto</a></h2>
+<p><code>goto label;</code> jumps to <code>label:</code> in the same function. It is useful for retry loops and for leaving nested loops at once.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> tries = <span class="n">0</span>;
+retry:
+    tries++;
+    <span class="k">if</span> (tries &lt; <span class="n">3</span>) {
+        printf(<span class="s">&quot;try %d failed\n&quot;</span>, tries);
+        <span class="k">goto</span> retry;
+    }
+    printf(<span class="s">&quot;succeeded on try %d\n&quot;</span>, tries);
+}</code></pre>
+<pre class="out"><code>try 1 failed
+try 2 failed
+succeeded on try 3</code></pre>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">10</span>; i++) {
+        <span class="k">for</span> (<span class="t">i64</span> j = <span class="n">0</span>; j &lt; <span class="n">10</span>; j++) {
+            <span class="k">if</span> (i * j == <span class="n">42</span>) {
+                printf(<span class="s">&quot;%d * %d = 42\n&quot;</span>, i, j);
+                <span class="k">goto</span> done;
+            }
+        }
+    }
+done:
+    printf(<span class="s">&quot;done\n&quot;</span>);
+}</code></pre>
+<pre class="out"><code>6 * 7 = 42
+done</code></pre>
+<p>A <code>goto</code> can't jump forward past a <code>defer</code> into the rest of its block, since the deferred statement would then run without its setup having happened.</p>
+    <nav class="pager"><a class="prev" href="04-operators.html"><span>Previous</span>Operators</a><a class="next" href="06-switch.html"><span>Next</span>switch</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#braces-are-required">Braces are required</a></li><li><a href="#parentheses-are-optional">Parentheses are optional</a></li><li><a href="#if-and-else">if and else</a></li><li><a href="#while">while</a></li><li><a href="#do-while">do ... while</a></li><li><a href="#for">for</a></li><li><a href="#break-and-continue">break and continue</a></li><li><a href="#the-range-based-for">The range-based for</a></li><li><a href="#goto">goto</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>

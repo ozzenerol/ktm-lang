@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Structs and unions - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html" class="on"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li></ol></aside>
+  <article class="prose">
+<h1>Structs and unions</h1>
+<p>A struct groups several values under one name; a union lets several fields share the same memory. This chapter covers declaring structs, initialising them, how they are copied, how they nest, how they are laid out in memory, declaring them ahead, and unions, named and anonymous. Methods on structs have their own chapter, <a href="13-methods.html">Methods</a>.</p>
+<h2 id="declaring-a-struct"><a href="#declaring-a-struct">Declaring a struct</a></h2>
+<p><code>struct Name { fields };</code> declares a type called <code>Name</code>. The name is a type straight away: there is no <code>typedef</code> to write and no <code>struct</code> keyword in front of it later.</p>
+<pre class="code run"><code><span class="k">struct</span> Point {
+    <span class="t">i64</span> x;
+    <span class="t">i64</span> y;
+};
+
+<span class="t">i32</span> main() {
+    Point p;
+    p.x = <span class="n">3</span>;
+    p.y = <span class="n">4</span>;
+    printf(<span class="s">&quot;(%d, %d)\n&quot;</span>, p.x, p.y);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>(3, 4)</code></pre>
+<p>Fields of one type can share a line, separated by commas:</p>
+<pre class="code run"><code><span class="k">struct</span> Rect {
+    <span class="t">i64</span> left, top, width, height;
+};
+
+<span class="t">i32</span> main() {
+    Rect r = {<span class="n">10</span>, <span class="n">20</span>, <span class="n">300</span>, <span class="n">200</span>};
+    printf(<span class="s">&quot;%d x %d at (%d, %d)\n&quot;</span>, r.width, r.height, r.left, r.top);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>300 x 200 at (10, 20)</code></pre>
+<p>A field can be of any type: numbers, pointers, arrays, slices, <code>String</code>, other structs.</p>
+<pre class="code run"><code><span class="k">struct</span> Book {
+    <span class="t">u8</span> *title;
+    <span class="t">i64</span> year;
+    <span class="t">f64</span> price;
+    <span class="t">bool</span> inPrint;
+};
+
+<span class="t">i32</span> main() {
+    Book b = {<span class="s">&quot;Dune&quot;</span>, <span class="n">1965</span>, <span class="n">9.99</span>, <span class="k">true</span>};
+    printf(<span class="s">&quot;%s (%d), %.2f, %d\n&quot;</span>, b.title, b.year, b.price, b.inPrint);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>Dune (1965), 9.99, 1</code></pre>
+<ul><li>Structs are declared at the top level of a file, not inside a function.</li><li>The <code>;</code> after the closing brace is required.</li></ul>
+<h2 id="initialising"><a href="#initialising">Initialising</a></h2>
+<p>A list in braces fills the fields in order. Fields the list leaves out are zero.</p>
+<pre class="code run"><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+
+<span class="t">i32</span> main() {
+    Point a = {<span class="n">7</span>, <span class="n">8</span>};
+    Point b = {<span class="n">7</span>};
+    printf(<span class="s">&quot;%d %d | %d %d\n&quot;</span>, a.x, a.y, b.x, b.y);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>7 8 | 7 0</code></pre>
+<p>A struct declared without a value starts with every field zero, like <code>{0}</code>:</p>
+<pre class="code run"><code><span class="k">struct</span> Counter { <span class="t">i64</span> hits; <span class="t">i64</span> misses; <span class="t">u8</span> *label; };
+
+<span class="t">i32</span> main() {
+    Counter c;
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, c.hits, c.misses, c.label == <span class="k">null</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>0 0 1</code></pre>
+<p>More values than fields is an error:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+
+<span class="t">i32</span> main() {
+    Point p = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>};
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>More initialisers than class fields</code></pre>
+<p>An initialiser list is only for a declaration. To set every field of an existing struct, assign the fields one by one, or copy in another struct:</p>
+<pre class="code run"><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+
+<span class="t">i32</span> main() {
+    Point p = {<span class="n">1</span>, <span class="n">2</span>};
+    Point origin = {<span class="n">0</span>, <span class="n">0</span>};
+    p = origin;
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, p.x, p.y);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>0 0</code></pre>
+<h3 id="nested-lists"><a href="#nested-lists">Nested lists</a></h3>
+<p>A field that is a struct or an array takes a nested list:</p>
+<pre class="code run"><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+<span class="k">struct</span> Line {
+    Point from, to;
+    <span class="t">i64</span> tags[<span class="n">2</span>];
+};
+
+<span class="t">i32</span> main() {
+    Line l = {{<span class="n">0</span>, <span class="n">0</span>}, {<span class="n">3</span>, <span class="n">4</span>}, {<span class="n">7</span>, <span class="n">8</span>}};
+    Line m = {{<span class="n">1</span>, <span class="n">2</span>}, {<span class="n">5</span>, <span class="n">6</span>}};
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, l.to.x, l.to.y, l.tags[<span class="n">1</span>]);
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, m.from.y, m.to.x, m.tags[<span class="n">0</span>]);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>3 4 8
+2 5 0</code></pre>
+<p>An array of structs takes one list per element; elements left out are zero:</p>
+<pre class="code run"><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+
+<span class="t">i32</span> main() {
+    Point ps[<span class="n">3</span>] = {{<span class="n">1</span>, <span class="n">2</span>}, {<span class="n">3</span>, <span class="n">4</span>}};
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">3</span>; i++) {
+        printf(<span class="s">&quot;(%d, %d) &quot;</span>, ps[i].x, ps[i].y);
+    }
+    printf(<span class="s">&quot;\n&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>(1, 2) (3, 4) (0, 0) </code></pre>
+<h3 id="strings-in-fields"><a href="#strings-in-fields">Strings in fields</a></h3>
+<p>A string literal given to a <code>u8</code> array field is copied into the struct, so the struct has its own writable copy; it must fit with its terminating zero. A <code>u8 *</code> field only points at the literal, which must not be written to.</p>
+<pre class="code run"><code><span class="k">struct</span> Item {
+    <span class="t">i64</span> id;
+    <span class="t">u8</span> name[<span class="n">8</span>];
+    <span class="t">u8</span> *note;
+};
+
+<span class="t">i32</span> main() {
+    Item it = {<span class="n">1</span>, <span class="s">&quot;pen&quot;</span>, <span class="s">&quot;blue ink&quot;</span>};
+    it.name[<span class="n">0</span>] = <span class="s">&#x27;P&#x27;</span>;
+    printf(<span class="s">&quot;%s, %s, %d bytes\n&quot;</span>, it.name, it.note, <span class="k">sizeof</span>(Item));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>Pen, blue ink, 24 bytes</code></pre>
+<p>A <code>String</code> field owns its text: give it one with <code>str.from</code> and free it when the struct is done with (see <a href="11-strings.html">Strings</a>).</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="k">struct</span> User {
+    <span class="t">String</span> name;
+    <span class="t">i64</span> age;
+};
+
+<span class="t">i32</span> main() {
+    User u;
+    u.name = str.from(<span class="s">&quot;ada&quot;</span>);
+    u.age = <span class="n">36</span>;
+    u.name.append(<span class="s">&quot; lovelace&quot;</span>);
+    printf(<span class="s">&quot;%.*s, %d\n&quot;</span>, u.name.len, u.name.ptr, u.age);
+    u.name.free();
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>ada lovelace, 36</code></pre>
+<h2 id="values-are-copied"><a href="#values-are-copied">Values are copied</a></h2>
+<p>A struct is a value. Assigning it, passing it to a function and returning it all copy every field; the copy and the original are independent afterwards.</p>
+<pre class="code run"><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+
+<span class="t">i32</span> main() {
+    Point a = {<span class="n">1</span>, <span class="n">2</span>};
+    Point b = a;
+    b.x = <span class="n">9</span>;
+    printf(<span class="s">&quot;a = (%d, %d), b = (%d, %d)\n&quot;</span>, a.x, a.y, b.x, b.y);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>a = (1, 2), b = (9, 2)</code></pre>
+<p>A function gets its own copy of a struct argument, so changing it doesn't touch the caller's:</p>
+<pre class="code run"><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+
+<span class="t">i64</span> sumAfterReset(Point p) {
+    p.x = <span class="n">1000</span>;
+    <span class="k">return</span> p.x + p.y;
+}
+
+<span class="t">i32</span> main() {
+    Point a = {<span class="n">1</span>, <span class="n">2</span>};
+    printf(<span class="s">&quot;%d\n&quot;</span>, sumAfterReset(a));
+    printf(<span class="s">&quot;%d\n&quot;</span>, a.x);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>1002
+1</code></pre>
+<p>A function can return a struct, and the result can be used straight away:</p>
+<pre class="code run"><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+
+Point make(<span class="t">i64</span> x, <span class="t">i64</span> y) {
+    Point r = {x, y};
+    <span class="k">return</span> r;
+}
+
+<span class="t">i32</span> main() {
+    Point p = make(<span class="n">3</span>, <span class="n">4</span>);
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, p.x, p.y, make(<span class="n">5</span>, <span class="n">6</span>).y);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>3 4 6</code></pre>
+<p>An array field is part of the struct, so it is copied too. A pointer field is copied as a pointer: both copies point at the same thing.</p>
+<pre class="code run"><code><span class="k">struct</span> Box {
+    <span class="t">i64</span> nums[<span class="n">3</span>];
+    <span class="t">i64</span> *shared;
+};
+
+<span class="t">i32</span> main() {
+    <span class="t">i64</span> n = <span class="n">5</span>;
+    Box a = {{<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>}, &amp;n};
+    Box b = a;
+    b.nums[<span class="n">0</span>] = <span class="n">100</span>;
+    *b.shared = <span class="n">50</span>;
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, a.nums[<span class="n">0</span>], b.nums[<span class="n">0</span>], *a.shared);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>1 100 50</code></pre>
+<p>Copying a struct that holds a <code>String</code> copies the <code>String</code> (its pointer, length and capacity), not the text: both structs then hold the same text, and only one may free it.</p>
+<h2 id="pointers-to-structs"><a href="#pointers-to-structs">Pointers to structs</a></h2>
+<p>To let a function change the caller's struct, pass its address. <code>.</code> reaches a field through a pointer too, so <code>p.x</code> works whether <code>p</code> is a struct or a pointer to one.</p>
+<pre class="code run"><code><span class="k">struct</span> Counter { <span class="t">i64</span> n; };
+
+<span class="t">void</span> bump(Counter *c) {
+    c.n++;
+}
+
+<span class="t">i32</span> main() {
+    Counter c = {<span class="n">0</span>};
+    bump(&amp;c);
+    bump(&amp;c);
+    printf(<span class="s">&quot;%d\n&quot;</span>, c.n);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>2</code></pre>
+<p>C's <code>-&gt;</code> is accepted as well and means the same:</p>
+<pre class="code run"><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+
+<span class="t">i32</span> main() {
+    Point a = {<span class="n">1</span>, <span class="n">2</span>};
+    Point *p = &amp;a;
+    p-&gt;x = <span class="n">7</span>;
+    p.y = <span class="n">8</span>;
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, a.x, a.y);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>7 8</code></pre>
+<p><code>*p</code> is the struct itself; assigning it to a variable copies it:</p>
+<pre class="code run"><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+
+<span class="t">i32</span> main() {
+    Point a = {<span class="n">1</span>, <span class="n">2</span>};
+    Point *p = &amp;a;
+    Point c = *p;
+    c.x = <span class="n">9</span>;
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, a.x, c.x);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>1 9</code></pre>
+<p>Large structs are cheaper to pass by pointer: a 1 KiB struct passed by value is 1 KiB copied on every call.</p>
+<h2 id="comparing-structs"><a href="#comparing-structs">Comparing structs</a></h2>
+<p><code>==</code> and <code>!=</code> don't apply to structs. Compare the fields that matter:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+
+<span class="t">i32</span> main() {
+    Point a = {<span class="n">1</span>, <span class="n">2</span>};
+    Point b = {<span class="n">1</span>, <span class="n">2</span>};
+    <span class="k">return</span> a == b;
+}</code></pre>
+<pre class="out"><code>`Point == Point` is invalid</code></pre>
+<pre class="code run"><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+
+<span class="t">bool</span> samePoint(Point a, Point b) {
+    <span class="k">return</span> a.x == b.x &amp;&amp; a.y == b.y;
+}
+
+<span class="t">i32</span> main() {
+    Point a = {<span class="n">1</span>, <span class="n">2</span>};
+    Point b = {<span class="n">1</span>, <span class="n">2</span>};
+    Point c = {<span class="n">2</span>, <span class="n">1</span>};
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, samePoint(a, b), samePoint(a, c));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>1 0</code></pre>
+<p>Two structs of different types don't convert into each other, even with the same fields:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="k">struct</span> Celsius { <span class="t">f64</span> v; };
+<span class="k">struct</span> Fahrenheit { <span class="t">f64</span> v; };
+
+<span class="t">i32</span> main() {
+    Celsius c = {<span class="n">20.0</span>};
+    Fahrenheit f = c;
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>`Fahrenheit = Celsius` is invalid</code></pre>
+<h2 id="nesting"><a href="#nesting">Nesting</a></h2>
+<p>A struct can hold another struct by value. The inner fields are reached with one more <code>.</code>:</p>
+<pre class="code run"><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+<span class="k">struct</span> Player {
+    <span class="t">u8</span> *name;
+    Point pos;
+    <span class="t">i64</span> score;
+};
+
+<span class="t">i32</span> main() {
+    Player p = {<span class="s">&quot;ada&quot;</span>, {<span class="n">3</span>, <span class="n">4</span>}, <span class="n">0</span>};
+    p.score += <span class="n">10</span>;
+    p.pos.x = <span class="n">0</span>;
+    printf(<span class="s">&quot;%s at (%d, %d) with %d\n&quot;</span>, p.name, p.pos.x, p.pos.y, p.score);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>ada at (0, 4) with 10</code></pre>
+<p>A struct can't hold itself by value (it would be infinitely large), but it can hold a pointer to its own type, which is how lists and trees are built:</p>
+<pre class="code run"><code><span class="k">struct</span> Node {
+    <span class="t">i64</span> value;
+    Node *next;
+};
+
+<span class="t">i32</span> main() {
+    Node c = {<span class="n">3</span>, <span class="k">null</span>};
+    Node b = {<span class="n">2</span>, &amp;c};
+    Node a = {<span class="n">1</span>, &amp;b};
+    <span class="k">for</span> (Node *n = &amp;a; n; n = n.next) {
+        printf(<span class="s">&quot;%d &quot;</span>, n.value);
+    }
+    printf(<span class="s">&quot;\n&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>1 2 3 </code></pre>
+<h3 id="an-anonymous-struct-inside-a-struct"><a href="#an-anonymous-struct-inside-a-struct">An anonymous struct inside a struct</a></h3>
+<p>A <code>struct { ... };</code> without a name inside a struct adds its fields to the outer struct, as if they were written there. It is mostly useful inside unions (below).</p>
+<pre class="code run"><code><span class="k">struct</span> Sample {
+    <span class="t">i64</span> id;
+    <span class="k">struct</span> {
+        <span class="t">i64</span> low;
+        <span class="t">i64</span> high;
+    };
+};
+
+<span class="t">i32</span> main() {
+    Sample s = {<span class="n">1</span>, <span class="n">20</span>, <span class="n">30</span>};
+    printf(<span class="s">&quot;%d %d %d, %d bytes\n&quot;</span>, s.id, s.low, s.high, <span class="k">sizeof</span>(Sample));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>1 20 30, 24 bytes</code></pre>
+<h2 id="size-and-layout"><a href="#size-and-layout">Size and layout</a></h2>
+<p>Fields are laid out in the order they are written, each at an offset that is a multiple of its own size (its alignment), as C does on the same machine. The struct's size is rounded up to its largest alignment, so arrays of it stay aligned. <code>sizeof</code> and <code>alignof</code> give both.</p>
+<pre class="code run"><code><span class="k">struct</span> A { <span class="t">u8</span> tag; <span class="t">i64</span> value; };
+<span class="k">struct</span> B { <span class="t">i64</span> value; <span class="t">u8</span> tag; };
+<span class="k">struct</span> C { <span class="t">i64</span> value; <span class="t">u8</span> tag; <span class="t">u8</span> flags; <span class="t">u16</span> port; };
+
+<span class="t">i32</span> main() {
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, <span class="k">sizeof</span>(A), <span class="k">sizeof</span>(B), <span class="k">sizeof</span>(C));
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, alignof(A), alignof(C));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>16 16 16
+8 8</code></pre>
+<p><code>A</code> has 7 bytes of padding after <code>tag</code>; <code>B</code> has 7 at its end. <code>C</code> fits its three small fields into the 8 bytes after <code>value</code>, so ordering fields from largest to smallest keeps structs small.</p>
+<pre class="code run"><code><span class="k">struct</span> Loose { <span class="t">u8</span> a; <span class="t">i64</span> b; <span class="t">u8</span> c; <span class="t">i64</span> d; };
+<span class="k">struct</span> Tight { <span class="t">i64</span> b; <span class="t">i64</span> d; <span class="t">u8</span> a; <span class="t">u8</span> c; };
+
+<span class="t">i32</span> main() {
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, <span class="k">sizeof</span>(Loose), <span class="k">sizeof</span>(Tight));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>32 24</code></pre>
+<p>A struct of only small fields is aligned to its largest one:</p>
+<pre class="code run"><code><span class="k">struct</span> Rgb { <span class="t">u8</span> r, g, b; };
+<span class="k">struct</span> Pair { <span class="t">u8</span> a; <span class="t">u16</span> b; <span class="t">u32</span> c; <span class="t">u8</span> d; };
+
+<span class="t">i32</span> main() {
+    printf(<span class="s">&quot;%d %d | %d %d\n&quot;</span>, <span class="k">sizeof</span>(Rgb), alignof(Rgb), <span class="k">sizeof</span>(Pair), alignof(Pair));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>3 1 | 12 4</code></pre>
+<p>The same layout as C means a ktm struct can be handed to a C function that expects the matching C struct (see <a href="26-calling-c.html">Calling C</a>). The offsets of the fields are available at run time through <a href="24-reflection.html">reflection</a>.</p>
+<h2 id="declaring-ahead"><a href="#declaring-ahead">Declaring ahead</a></h2>
+<p><code>struct Name;</code> declares a struct that is defined further down. Until its definition, it can only be pointed to:</p>
+<pre class="code run"><code><span class="k">struct</span> Node;
+
+<span class="k">struct</span> List {
+    Node *head;
+    <span class="t">i64</span> len;
+};
+
+<span class="k">struct</span> Node {
+    <span class="t">i64</span> value;
+    Node *next;
+};
+
+<span class="t">i32</span> main() {
+    Node b = {<span class="n">2</span>, <span class="k">null</span>};
+    Node a = {<span class="n">1</span>, &amp;b};
+    List l = {&amp;a, <span class="n">2</span>};
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, l.head.value, l.head.next.value, l.len);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>1 2 2</code></pre>
+<p>Two structs that point at each other need it:</p>
+<pre class="code run"><code><span class="k">struct</span> Owner;
+
+<span class="k">struct</span> Pet {
+    <span class="t">u8</span> *name;
+    Owner *owner;
+};
+
+<span class="k">struct</span> Owner {
+    <span class="t">u8</span> *name;
+    Pet *pet;
+};
+
+<span class="t">i32</span> main() {
+    Owner o = {<span class="s">&quot;ada&quot;</span>, <span class="k">null</span>};
+    Pet p = {<span class="s">&quot;rex&quot;</span>, &amp;o};
+    o.pet = &amp;p;
+    printf(<span class="s">&quot;%s&#x27;s pet %s belongs to %s\n&quot;</span>, o.name, o.pet.name, p.owner.name);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>ada&#x27;s pet rex belongs to ada</code></pre>
+<p>Holding a declared-ahead struct by value before its definition is an error, because its size isn't known yet:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="k">struct</span> B;
+
+<span class="k">struct</span> A {
+    B b;
+};
+
+<span class="k">struct</span> B { <span class="t">i64</span> x; };
+
+<span class="t">i32</span> main() {
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>which is not complete here</code></pre>
+<h2 id="unions"><a href="#unions">Unions</a></h2>
+<p>A union is declared like a struct, but all its fields start at the same address, so they share the memory. Writing one field overwrites the others; the union is as large as its largest field.</p>
+<pre class="code run"><code><span class="k">union</span> Bits {
+    <span class="t">i64</span> i;
+    <span class="t">f64</span> f;
+    <span class="t">u8</span> bytes[<span class="n">8</span>];
+};
+
+<span class="t">i32</span> main() {
+    Bits b;
+    b.i = <span class="n">0x41</span>;
+    printf(<span class="s">&quot;%c, %d bytes\n&quot;</span>, b.bytes[<span class="n">0</span>], <span class="k">sizeof</span>(Bits));
+    b.f = <span class="n">1.0</span>;
+    printf(<span class="s">&quot;%x\n&quot;</span>, b.i);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>A, 8 bytes
+3ff0000000000000</code></pre>
+<p>The second line shows the bits of the <code>f64</code> 1.0 read back as an integer: reading a field other than the one written last reinterprets the bytes.</p>
+<p>An initialiser list gives a union one value, for its first field:</p>
+<pre class="code run"><code><span class="k">union</span> Number {
+    <span class="t">i64</span> whole;
+    <span class="t">f64</span> real;
+};
+
+<span class="t">i32</span> main() {
+    Number n = {<span class="n">42</span>};
+    printf(<span class="s">&quot;%d\n&quot;</span>, n.whole);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>42</code></pre>
+<h3 id="anonymous-unions-tagged-values"><a href="#anonymous-unions-tagged-values">Anonymous unions: tagged values</a></h3>
+<p>An anonymous union inside a struct puts its fields into the struct, sharing one slot. With a field that says which of them is in use (a tag), this is the classic way to keep one of several kinds of value:</p>
+<pre class="code run"><code><span class="k">enum</span> Kind { num, text };
+
+<span class="k">struct</span> Value {
+    Kind kind;
+    <span class="k">union</span> {
+        <span class="t">i64</span> n;
+        <span class="t">u8</span> *s;
+    };
+};
+
+<span class="t">void</span> show(Value v) {
+    <span class="k">if</span> (v.kind == Kind.num) {
+        printf(<span class="s">&quot;number %d\n&quot;</span>, v.n);
+    } <span class="k">else</span> {
+        printf(<span class="s">&quot;text %s\n&quot;</span>, v.s);
+    }
+}
+
+<span class="t">i32</span> main() {
+    Value a = {Kind.num, <span class="n">42</span>};
+    Value b;
+    b.kind = Kind.text;
+    b.s = <span class="s">&quot;hi&quot;</span>;
+    show(a);
+    show(b);
+    printf(<span class="s">&quot;%d bytes\n&quot;</span>, <span class="k">sizeof</span>(Value));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>number 42
+text hi
+16 bytes</code></pre>
+<p>The union takes 8 bytes whichever field is used, so <code>Value</code> is 16 bytes: the tag (padded to 8) and the shared slot. The initialiser list fills the tag, then the union's first field.</p>
+<p>An anonymous union can hold anonymous structs, for kinds of value with several fields each:</p>
+<pre class="code run"><code><span class="k">enum</span> Shape { circle, rect };
+
+<span class="k">struct</span> Figure {
+    Shape shape;
+    <span class="k">union</span> {
+        <span class="k">struct</span> { <span class="t">f64</span> radius; };
+        <span class="k">struct</span> { <span class="t">f64</span> width; <span class="t">f64</span> height; };
+    };
+};
+
+<span class="t">f64</span> area(Figure f) {
+    <span class="k">if</span> (f.shape == Shape.circle) {
+        <span class="k">return</span> <span class="n">3.14159</span> * f.radius * f.radius;
+    }
+    <span class="k">return</span> f.width * f.height;
+}
+
+<span class="t">i32</span> main() {
+    Figure c;
+    c.shape = Shape.circle;
+    c.radius = <span class="n">2.0</span>;
+    Figure r;
+    r.shape = Shape.rect;
+    r.width = <span class="n">3.0</span>;
+    r.height = <span class="n">4.0</span>;
+    printf(<span class="s">&quot;%.2f %.2f\n&quot;</span>, area(c), area(r));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>12.57 12.00</code></pre>
+<h3 id="named-inner-types"><a href="#named-inner-types">Named inner types</a></h3>
+<p>A struct or union defined inside a struct can have a name of its own. A named union inside a struct still adds its fields to the struct; a named struct followed by a field name declares a field of that type. Either name can be used as a type elsewhere:</p>
+<pre class="code run"><code><span class="k">struct</span> Shape {
+    <span class="t">u8</span> kind;
+    <span class="k">union</span> Size { <span class="t">i32</span> side; <span class="t">f32</span> radius; };
+    <span class="k">struct</span> Pos { <span class="t">i32</span> x, y; } at;
+};
+
+<span class="t">i32</span> main() {
+    Shape s;
+    s.side = <span class="n">3</span>;
+    s.at.x = <span class="n">10</span>;
+    Size z;
+    z.radius = <span class="n">1.5</span>;
+    Pos p = {<span class="n">1</span>, <span class="n">2</span>};
+    printf(<span class="s">&quot;%d %d %.1f %d | %d %d\n&quot;</span>, s.side, s.at.x, z.radius, p.y, <span class="k">sizeof</span>(Size), <span class="k">sizeof</span>(Shape));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>3 10 1.5 2 | 4 16</code></pre>
+<h2 id="rules"><a href="#rules">Rules</a></h2>
+<ul><li>A struct's name is a type; there is no <code>typedef</code> step.</li><li>Structs and unions are declared at the top level of a file.</li><li><code>{a, b, ...}</code> initialises fields in order, in a declaration only; missing fields are zero, extra ones are an error. A struct declared without one is all zero.</li><li>Assigning, passing and returning a struct copy it, arrays inside included; pointers inside are copied as pointers.</li><li><code>.</code> reaches a field through a pointer too; <code>-&gt;</code> is accepted and means the same.</li><li><code>==</code> and <code>!=</code> don't apply to structs, and different struct types don't convert.</li><li>The layout is C's: fields in order, each aligned to its size, the size rounded up to the largest alignment.</li><li><code>struct Name;</code> declares ahead: pointers to it work at once, holding it by value only after its definition.</li><li>A union's fields share its memory; its initialiser list sets the first field.</li><li>Anonymous structs and unions inside a struct add their fields to it.</li></ul>
+    <nav class="pager"><a class="prev" href="11-strings.html"><span>Previous</span>Strings</a><a class="next" href="13-methods.html"><span>Next</span>Methods</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#declaring-a-struct">Declaring a struct</a></li><li><a href="#initialising">Initialising</a></li><li><a href="#values-are-copied">Values are copied</a></li><li><a href="#pointers-to-structs">Pointers to structs</a></li><li><a href="#comparing-structs">Comparing structs</a></li><li><a href="#nesting">Nesting</a></li><li><a href="#size-and-layout">Size and layout</a></li><li><a href="#declaring-ahead">Declaring ahead</a></li><li><a href="#unions">Unions</a></li><li><a href="#rules">Rules</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>

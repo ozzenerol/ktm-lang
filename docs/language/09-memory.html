@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memory - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html" class="on"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li></ol></aside>
+  <article class="prose">
+<h1>Memory</h1>
+<p>Where values live, how to allocate memory that outlives a function, how to give it back, and the habits that keep a program free of leaks. ktm has no garbage collector: memory you allocate is yours until you free it.</p>
+<h2 id="three-places-a-value-lives"><a href="#three-places-a-value-lives">Three places a value lives</a></h2>
+<ul><li><strong>Locals</strong> live on the stack, from their declaration to the end of their block. They cost nothing to create and are freed automatically.</li><li><strong>Globals</strong> and <code>static</code> locals live for the whole program.</li><li><strong>Heap memory</strong> lives from the moment you allocate it until you free it. Use it when a value must outlive the function that makes it, or when its size is known only at run time.</li></ul>
+<h2 id="allocating-and-freeing"><a href="#allocating-and-freeing">Allocating and freeing</a></h2>
+<p>The <a href="../std/index.html#mem">mem</a> module allocates, resizes and frees.</p>
+<div class="table"><table><thead><tr><th>Function</th><th>Does</th></tr></thead><tbody><tr><td><code>mem.alloc(size)</code></td><td>Allocates <code>size</code> bytes, not zeroed</td></tr><tr><td><code>mem.allocZero(size)</code></td><td>Allocates <code>size</code> bytes, all zero</td></tr><tr><td><code>mem.realloc(p, size)</code></td><td>Resizes; <code>mem.realloc(null, n)</code> is <code>mem.alloc(n)</code></td></tr><tr><td><code>mem.free(p)</code></td><td>Gives the memory back; <code>mem.free(null)</code> does nothing</td></tr><tr><td><code>mem.size(p)</code></td><td>The size that was asked for (0 for <code>null</code>)</td></tr><tr><td><code>mem.copy(dst, src, n)</code></td><td>Copies <code>n</code> bytes; returns <code>dst</code></td></tr><tr><td><code>mem.set(dst, byte, n)</code></td><td>Fills <code>n</code> bytes with <code>byte</code>; returns <code>dst</code></td></tr></tbody></table></div>
+<pre class="code run"><code><span class="k">import</span> mem;
+
+<span class="t">void</span> main() {
+    <span class="t">i64</span> n = <span class="n">4</span>;
+    <span class="t">i64</span> *nums = mem.allocZero(n * <span class="k">sizeof</span>(<span class="t">i64</span>));
+    nums[<span class="n">2</span>] = <span class="n">7</span>;
+    printf(<span class="s">&quot;%d %d, %d bytes\n&quot;</span>, nums[<span class="n">0</span>], nums[<span class="n">2</span>], mem.size(nums));
+    mem.free(nums);
+}</code></pre>
+<pre class="out"><code>0 7, 32 bytes</code></pre>
+<p>The result of <code>mem.alloc</code> is a <code>void *</code>, which converts to any pointer type without a cast.</p>
+<h3 id="an-array-of-structs"><a href="#an-array-of-structs">An array of structs</a></h3>
+<pre class="code run"><code><span class="k">import</span> mem;
+
+<span class="k">struct</span> Player { <span class="t">u8</span> *name; <span class="t">i64</span> score; };
+
+<span class="t">void</span> main() {
+    Player *team = mem.allocZero(<span class="n">3</span> * <span class="k">sizeof</span>(Player));
+    team[<span class="n">0</span>].name = <span class="s">&quot;ada&quot;</span>;
+    team[<span class="n">0</span>].score = <span class="n">10</span>;
+    team[<span class="n">2</span>].name = <span class="s">&quot;linus&quot;</span>;
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">3</span>; i++) {
+        printf(<span class="s">&quot;%s: %d\n&quot;</span>, team[i].name ? team[i].name : <span class="s">&quot;(empty)&quot;</span>, team[i].score);
+    }
+    mem.free(team);
+}</code></pre>
+<pre class="out"><code>ada: 10
+(empty): 0
+linus: 0</code></pre>
+<h3 id="a-value-that-outlives-its-function"><a href="#a-value-that-outlives-its-function">A value that outlives its function</a></h3>
+<p>A function that makes something on the heap and returns the pointer hands its ownership to the caller, who frees it later.</p>
+<pre class="code run"><code><span class="k">import</span> mem;
+
+<span class="k">struct</span> Counter { <span class="t">i64</span> value; };
+
+Counter *counterNew(<span class="t">i64</span> start) {
+    Counter *c = mem.alloc(<span class="k">sizeof</span>(Counter));
+    c.value = start;
+    <span class="k">return</span> c;
+}
+
+<span class="t">void</span> main() {
+    Counter *c = counterNew(<span class="n">5</span>);
+    c.value++;
+    printf(<span class="s">&quot;%d\n&quot;</span>, c.value);
+    mem.free(c);
+}</code></pre>
+<pre class="out"><code>6</code></pre>
+<h2 id="growing"><a href="#growing">Growing</a></h2>
+<p><code>mem.realloc</code> gives a block a new size and keeps its contents (as much as fits). It may move the block, so always use the pointer it returns.</p>
+<pre class="code run"><code><span class="k">import</span> mem;
+
+<span class="t">void</span> main() {
+    <span class="t">i64</span> cap = <span class="n">2</span>, len = <span class="n">0</span>;
+    <span class="t">i64</span> *items = mem.alloc(cap * <span class="k">sizeof</span>(<span class="t">i64</span>));
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">1</span>; i &lt;= <span class="n">5</span>; i++) {
+        <span class="k">if</span> (len == cap) {
+            cap *= <span class="n">2</span>;
+            items = mem.realloc(items, cap * <span class="k">sizeof</span>(<span class="t">i64</span>));
+        }
+        items[len] = i * i;
+        len++;
+    }
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; len; i++) {
+        printf(<span class="s">&quot;%d &quot;</span>, items[i]);
+    }
+    printf(<span class="s">&quot;(capacity %d)\n&quot;</span>, cap);
+    mem.free(items);
+}</code></pre>
+<pre class="out"><code>1 4 9 16 25 (capacity 8)</code></pre>
+<p>You rarely need to write this: <a href="../std/index.html#vec/vec.Vec">vec.Vec</a> is a growable array that does it for you.</p>
+<pre class="code run"><code><span class="k">import</span> vec;
+
+<span class="t">void</span> main() {
+    vec.Vec&lt;<span class="t">i64</span>&gt; items = vec.new&lt;<span class="t">i64</span>&gt;();
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">1</span>; i &lt;= <span class="n">5</span>; i++) {
+        items.push(i * i);
+    }
+    <span class="k">for</span> (<span class="k">auto</span> x : items) {
+        printf(<span class="s">&quot;%d &quot;</span>, x);
+    }
+    printf(<span class="s">&quot;(%d items)\n&quot;</span>, items.len);
+    items.free();
+}</code></pre>
+<pre class="out"><code>1 4 9 16 25 (5 items)</code></pre>
+<h2 id="copying-and-filling"><a href="#copying-and-filling">Copying and filling</a></h2>
+<pre class="code run"><code><span class="k">import</span> mem;
+
+<span class="t">void</span> main() {
+    <span class="t">u8</span> a[<span class="n">8</span>], b[<span class="n">8</span>];
+    mem.set(a, <span class="s">&#x27;x&#x27;</span>, <span class="n">7</span>);
+    a[<span class="n">7</span>] = <span class="n">0</span>;
+    mem.copy(b, <span class="s">&quot;abcdefg&quot;</span>, <span class="n">8</span>);    <span class="c">// 7 letters and the NUL</span>
+    printf(<span class="s">&quot;%s %s\n&quot;</span>, a, b);
+
+    <span class="t">i64</span> src[<span class="n">3</span>] = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>}, dst[<span class="n">3</span>];
+    mem.copy(dst, src, <span class="k">sizeof</span>(src));
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, dst[<span class="n">0</span>], dst[<span class="n">1</span>], dst[<span class="n">2</span>]);
+}</code></pre>
+<pre class="out"><code>xxxxxxx abcdefg
+1 2 3</code></pre>
+<p><code>mem.copy</code> copies front to back. For a source and a destination that overlap, use <code>libc.memmove</code>.</p>
+<h2 id="who-frees-what"><a href="#who-frees-what">Who frees what</a></h2>
+<p>The rule that keeps programs leak-free: every allocation has one owner, who frees it once. The standard library says who owns what in each function's description; the usual cases are:</p>
+<ul><li>a function that returns a new <code>String</code>, a <code>vec.Vec</code>, a <code>map.Map</code> or a pointer from <code>mem.alloc</code> gives it to you: you free it;</li><li>a function that takes a <code>u8[]</code> or a pointer only reads it: you still own it;</li><li>memory a container holds belongs to the container, and its <code>free()</code> releases it.</li></ul>
+<h3 id="freeing-at-the-end-of-a-block"><a href="#freeing-at-the-end-of-a-block">Freeing at the end of a block</a></h3>
+<p><code>defer</code> runs a statement when the block ends, however it ends: the end of the block, a <code>return</code>, a <code>break</code>, or an error. Writing the free right after the allocation means it can't be forgotten.</p>
+<pre class="code run"><code><span class="k">import</span> mem;
+
+<span class="t">i64</span> sumFirst(<span class="t">i64</span> n) {
+    <span class="t">i64</span> *nums = mem.alloc(n * <span class="k">sizeof</span>(<span class="t">i64</span>));
+    <span class="k">defer</span> mem.free(nums);
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; n; i++) {
+        nums[i] = i;
+    }
+    <span class="k">if</span> (n &gt; <span class="n">3</span>) {
+        <span class="k">return</span> -<span class="n">1</span>;      <span class="c">// the defer still frees nums</span>
+    }
+    <span class="t">i64</span> s = <span class="n">0</span>;
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; n; i++) {
+        s += nums[i];
+    }
+    <span class="k">return</span> s;
+}
+
+<span class="t">void</span> main() {
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, sumFirst(<span class="n">3</span>), sumFirst(<span class="n">10</span>));
+}</code></pre>
+<pre class="out"><code>3 -1</code></pre>
+<h3 id="ad"><a href="#ad">ad</a></h3>
+<p>For a value with a <code>free()</code> method, <code>ad</code> in front of its declaration means "free it at the end of the block". It is the shortest way to own something.</p>
+<pre class="code run"><code><span class="k">import</span> str, vec;
+
+<span class="t">void</span> main() {
+    <span class="k">ad</span> <span class="t">String</span> name = str.from(<span class="s">&quot;ada&quot;</span>);
+    <span class="k">ad</span> vec.Vec&lt;<span class="t">i64</span>&gt; nums = vec.new&lt;<span class="t">i64</span>&gt;();
+    nums.push(<span class="n">1</span>);
+    nums.push(<span class="n">2</span>);
+    name.append(<span class="s">&quot; lovelace&quot;</span>);
+    printf(<span class="s">&quot;%s, %d numbers\n&quot;</span>, name, nums.len);
+}</code></pre>
+<pre class="out"><code>ada lovelace, 2 numbers</code></pre>
+<p>Your own types get <code>ad</code> by having a <code>free()</code> method:</p>
+<pre class="code run"><code><span class="k">import</span> mem;
+
+<span class="k">struct</span> Grid { <span class="t">i64</span> w; <span class="t">i64</span> h; <span class="t">u8</span> *cells; };
+
+Grid gridNew(<span class="t">i64</span> w, <span class="t">i64</span> h) {
+    Grid g = {w, h, mem.allocZero(w * h)};
+    <span class="k">return</span> g;
+}
+
+<span class="t">void</span> Grid.free() {
+    printf(<span class="s">&quot;freeing %dx%d\n&quot;</span>, self.w, self.h);
+    mem.free(self.cells);
+}
+
+<span class="t">void</span> Grid.set(<span class="t">i64</span> x, <span class="t">i64</span> y) {
+    self.cells[y * self.w + x] = <span class="n">1</span>;
+}
+
+<span class="t">void</span> main() {
+    <span class="k">ad</span> Grid g = gridNew(<span class="n">4</span>, <span class="n">3</span>);
+    g.set(<span class="n">1</span>, <span class="n">2</span>);
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, g.cells[<span class="n">2</span> * <span class="n">4</span> + <span class="n">1</span>], g.cells[<span class="n">0</span>]);
+}</code></pre>
+<pre class="out"><code>1 0
+freeing 4x3</code></pre>
+<p><a href="16-defer-and-ad.html">defer and ad</a> covers both in depth.</p>
+<h2 id="finding-memory-bugs"><a href="#finding-memory-bugs">Finding memory bugs</a></h2>
+<p>Run a program with <code>-jit -Memsafe</code> and ktm watches every allocation. Freeing a block twice, or freeing something that was never allocated, is reported (and skipped, so the heap stays healthy) as it happens; memory still allocated at exit is reported then, each with the line that allocated it.</p>
+<pre class="code run"><code><span class="k">import</span> mem;
+
+<span class="t">void</span> main() {
+    <span class="t">u8</span> *a = mem.alloc(<span class="n">16</span>);
+    <span class="t">u8</span> *b = mem.alloc(<span class="n">32</span>);
+    b[<span class="n">0</span>] = <span class="n">1</span>;
+    mem.free(a);
+    printf(<span class="s">&quot;done\n&quot;</span>);
+}</code></pre>
+<pre class="out"><code>done</code></pre>
+<p>That program leaks <code>b</code>, which <code>-Memsafe</code> reports when it ends:</p>
+<pre class="code"><code>$ ktm -jit -Memsafe leaky.ktm
+done
+memsafe: 1 allocation(s) (32 bytes) never freed
+  0x55d1c2a4f2e8        32 bytes  at leaky.ktm:5 in main</code></pre>
+<p><a href="29-safety-and-debugging.html">Safety and debugging</a> shows the other checks.</p>
+<h2 id="where-it-differs-from-c"><a href="#where-it-differs-from-c">Where it differs from C</a></h2>
+<ul><li><code>mem.allocZero</code> takes one argument, the total size, unlike <code>calloc(count, size)</code>.</li><li>The allocators return <code>null</code> when memory runs out, or for an absurd size.</li><li>Each block keeps its size in a hidden header, so only pointers from <code>mem.alloc</code>, <code>mem.allocZero</code> and <code>mem.realloc</code> may go to <code>mem.free</code>, <code>mem.size</code> and <code>mem.realloc</code>. Memory from C's <code>malloc</code> goes back to C's <code>free</code>.</li></ul>
+    <nav class="pager"><a class="prev" href="08-pointers.html"><span>Previous</span>Pointers</a><a class="next" href="10-arrays-and-slices.html"><span>Next</span>Arrays and slices</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#three-places-a-value-lives">Three places a value lives</a></li><li><a href="#allocating-and-freeing">Allocating and freeing</a></li><li><a href="#growing">Growing</a></li><li><a href="#copying-and-filling">Copying and filling</a></li><li><a href="#who-frees-what">Who frees what</a></li><li><a href="#finding-memory-bugs">Finding memory bugs</a></li><li><a href="#where-it-differs-from-c">Where it differs from C</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>

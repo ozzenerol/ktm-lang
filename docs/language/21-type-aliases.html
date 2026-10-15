@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Type aliases - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html" class="on"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li></ol></aside>
+  <article class="prose">
+<h1>Type aliases</h1>
+<p><code>type Name = T;</code> gives a type a second name. The alias is the type itself, not a new one: the two are interchangeable everywhere. This chapter covers declaring aliases, naming long types with them, what "the same type" means, aliases of arrays and generic instances, and aliases in modules.</p>
+<h2 id="declaring-an-alias"><a href="#declaring-an-alias">Declaring an alias</a></h2>
+<pre class="code run"><code>type Celsius = <span class="t">f64</span>;
+type Count = <span class="t">i64</span>;
+
+<span class="t">i32</span> main() {
+    Celsius t = <span class="n">21.5</span>;
+    Count n = <span class="n">3</span>;
+    printf(<span class="s">&quot;%.1f %d\n&quot;</span>, t, n);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>21.5 3</code></pre>
+<p>The name can stand for any type: a slice, a pointer, a function pointer, a struct, an array, a generic instance.</p>
+<pre class="code run"><code>type Text = <span class="t">u8</span>[];
+type Name = <span class="t">u8</span> *;
+type Handler = fn(<span class="t">i64</span>) <span class="t">bool</span>;
+
+<span class="t">bool</span> positive(<span class="t">i64</span> n) {
+    <span class="k">return</span> n &gt; <span class="n">0</span>;
+}
+
+<span class="t">i32</span> main() {
+    Text t = <span class="s">&quot;hello&quot;</span>;
+    Name n = <span class="s">&quot;ada&quot;</span>;
+    Handler h = &amp;positive;
+    printf(<span class="s">&quot;%d %s %d\n&quot;</span>, t.len, n, h(<span class="n">5</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>5 ada 1</code></pre>
+<h2 id="naming-long-types"><a href="#naming-long-types">Naming long types</a></h2>
+<p>Aliases make signatures read as what they mean, especially with function pointer types:</p>
+<pre class="code run"><code>type Text = <span class="t">u8</span>[];
+type Handler = fn(<span class="t">i64</span>, Text) <span class="t">bool</span>;
+type Celsius = <span class="t">f64</span>;
+
+<span class="k">struct</span> Reading {
+    Text place;
+    Celsius temp;
+};
+
+type Readings = Reading[];
+
+<span class="t">bool</span> show(<span class="t">i64</span> i, Text place) {
+    printf(<span class="s">&quot;%d: %.*s\n&quot;</span>, i, place.len, place.ptr);
+    <span class="k">return</span> <span class="k">true</span>;
+}
+
+Celsius warmest(Readings all, Handler each) {
+    Celsius best = -<span class="n">273.15</span>;
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; all.len; i++) {
+        each(i, all[i].place);
+        <span class="k">if</span> (all[i].temp &gt; best) {
+            best = all[i].temp;
+        }
+    }
+    <span class="k">return</span> best;
+}
+
+<span class="t">i32</span> main() {
+    Reading r[<span class="n">3</span>] = {{<span class="s">&quot;Iasi&quot;</span>, <span class="n">18.5</span>}, {<span class="s">&quot;Cluj&quot;</span>, <span class="n">21.0</span>}, {<span class="s">&quot;Sibiu&quot;</span>, <span class="n">16.25</span>}};
+    printf(<span class="s">&quot;warmest %.1f\n&quot;</span>, warmest(r, &amp;show));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>0: Iasi
+1: Cluj
+2: Sibiu
+warmest 21.0</code></pre>
+<h2 id="an-alias-is-the-same-type"><a href="#an-alias-is-the-same-type">An alias is the same type</a></h2>
+<p>A <code>Celsius</code> and an <code>f64</code> pass to each other with no conversion; <code>sizeof</code>, <code>typeof</code> and error messages see the real type:</p>
+<pre class="code run"><code>type Celsius = <span class="t">f64</span>;
+type Text = <span class="t">u8</span>[];
+
+<span class="t">i32</span> main() {
+    Celsius c = <span class="n">21.5</span>;
+    <span class="t">f64</span> f = c;
+    Text t = <span class="s">&quot;hello&quot;</span>;
+    <span class="t">u8</span>[] s = t;
+    printf(<span class="s">&quot;%.1f %.*s %d %s\n&quot;</span>, f, s.len, s.ptr, <span class="k">sizeof</span>(Text), <span class="k">typeof</span>(c));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>21.5 hello 16 f64</code></pre>
+<p>An alias of a struct is that struct: values of either name assign to each other, and the struct's methods work through the alias.</p>
+<pre class="code run"><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+
+<span class="t">i64</span> Point.sum() {
+    <span class="k">return</span> self.x + self.y;
+}
+
+type Pos = Point;
+
+<span class="t">i32</span> main() {
+    Point a = {<span class="n">1</span>, <span class="n">2</span>};
+    Pos b = a;
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, b.y, b.sum());
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>2 3</code></pre>
+<p>Methods are defined with the struct's own name: <code>i64 Point.sum()</code>, not <code>Pos.sum()</code>.</p>
+<p>Because an alias is not a new type, it doesn't stop units from being mixed up:</p>
+<pre class="code run"><code>type Celsius = <span class="t">f64</span>;
+type Fahrenheit = <span class="t">f64</span>;
+
+<span class="t">void</span> heat(Celsius c) {
+    printf(<span class="s">&quot;heating to %.1f C\n&quot;</span>, c);
+}
+
+<span class="t">i32</span> main() {
+    Fahrenheit f = <span class="n">100.0</span>;
+    heat(f);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>heating to 100.0 C</code></pre>
+<p>For a type that the compiler keeps apart, wrap the value in a struct: two structs never convert into each other (see <a href="12-structs-and-unions.html">Structs and unions</a>).</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="k">struct</span> Celsius { <span class="t">f64</span> v; };
+<span class="k">struct</span> Fahrenheit { <span class="t">f64</span> v; };
+
+<span class="t">void</span> heat(Celsius c) {
+}
+
+<span class="t">i32</span> main() {
+    Fahrenheit f = {<span class="n">100.0</span>};
+    heat(f);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>expected &#x27;Celsius&#x27; got &#x27;Fahrenheit&#x27;</code></pre>
+<h2 id="fixed-arrays-and-generic-instances"><a href="#fixed-arrays-and-generic-instances">Fixed arrays and generic instances</a></h2>
+<p>An alias of an array type includes the size, and declares arrays of it:</p>
+<pre class="code run"><code>type Buf = <span class="t">u8</span>[<span class="n">8</span>];
+type Matrix = <span class="t">f64</span>[<span class="n">2</span>][<span class="n">2</span>];
+
+<span class="t">i32</span> main() {
+    Buf b;
+    b[<span class="n">0</span>] = <span class="s">&#x27;k&#x27;</span>;
+    Matrix m = {{<span class="n">1.0</span>, <span class="n">2.0</span>}, {<span class="n">3.0</span>, <span class="n">4.0</span>}};
+    printf(<span class="s">&quot;%d %c %d %.1f\n&quot;</span>, <span class="k">sizeof</span>(Buf), b[<span class="n">0</span>], <span class="k">sizeof</span>(Matrix), m[<span class="n">1</span>][<span class="n">0</span>]);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>8 k 32 3.0</code></pre>
+<p>An alias names one instance of a generic type, with its arguments written out:</p>
+<pre class="code run"><code><span class="k">import</span> vec, map;
+
+type Ints = vec.Vec&lt;<span class="t">i64</span>&gt;;
+type Ages = map.Map&lt;<span class="t">u8</span> *, <span class="t">i64</span>&gt;;
+
+<span class="t">i32</span> main() {
+    <span class="k">ad</span> Ints nums = vec.new&lt;<span class="t">i64</span>&gt;();
+    nums.push(<span class="n">3</span>);
+    nums.push(<span class="n">4</span>);
+    <span class="k">ad</span> Ages ages = map.new&lt;<span class="t">u8</span> *, <span class="t">i64</span>&gt;();
+    ages.set(<span class="s">&quot;ann&quot;</span>, <span class="n">41</span>);
+    printf(<span class="s">&quot;%d %d %s\n&quot;</span>, nums.len, ages.getOr(<span class="s">&quot;ann&quot;</span>, <span class="n">0</span>), <span class="k">typeof</span>(nums));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>2 41 vec.Vec&lt;i64&gt;</code></pre>
+<p>An alias can't take type parameters of its own: <code>type ByName&lt;V&gt; = map.Map&lt;u8 *, V&gt;;</code> is not ktm. Name each instance instead.</p>
+<h2 id="where-aliases-go"><a href="#where-aliases-go">Where aliases go</a></h2>
+<p>Aliases are declared at the top level of a file. In a program an alias can only name types declared above it, and is only usable below it:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">i32</span> main() {
+    Later x = <span class="n">1</span>;
+    <span class="k">return</span> <span class="n">0</span>;
+}
+
+type Later = <span class="t">i64</span>;</code></pre>
+<pre class="out"><code>Type `Later` has not been declared</code></pre>
+<p>Two aliases that name each other are an error.</p>
+<p>In a module, any order works, and an alias is private unless it is <code>pub</code>; outside the module it is <code>module.Name</code> (see <a href="22-modules-and-packages.html">Modules and packages</a>):</p>
+<pre class="code"><code><span class="k">module</span> units;
+
+<span class="k">pub</span> type Meters = <span class="t">f64</span>;      <span class="c">// units.Meters for the module&#x27;s importers</span>
+type Scratch = <span class="t">u8</span>[<span class="n">64</span>];      <span class="c">// only this module sees it</span></code></pre>
+<p><code>type</code> is a keyword only at the start of such a declaration: a variable or a field can still be called <code>type</code>.</p>
+<pre class="code run"><code>type Id = <span class="t">i64</span>;
+
+<span class="k">struct</span> Token {
+    <span class="t">u8</span> *type;
+    Id id;
+};
+
+<span class="t">i32</span> main() {
+    Token t = {<span class="s">&quot;word&quot;</span>, <span class="n">7</span>};
+    printf(<span class="s">&quot;%s %d\n&quot;</span>, t.type, t.id);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>word 7</code></pre>
+<h2 id="rules"><a href="#rules">Rules</a></h2>
+<ul><li><code>type Name = T;</code> makes <code>Name</code> another name for <code>T</code>; both are the same type everywhere.</li><li><code>T</code> can be any type: numbers, pointers, slices, fixed arrays, function pointers, structs, generic instances with their arguments.</li><li>Aliases have no type parameters of their own.</li><li>They are declared at the top level; in a program before their use, in a module in any order.</li><li>In a module an alias is private unless <code>pub</code>, and is <code>module.Name</code> outside.</li><li>For a distinct type the compiler keeps apart, use a struct.</li></ul>
+    <nav class="pager"><a class="prev" href="20-function-pointers.html"><span>Previous</span>Function pointers</a><a class="next" href="22-modules-and-packages.html"><span>Next</span>Modules and packages</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#declaring-an-alias">Declaring an alias</a></li><li><a href="#naming-long-types">Naming long types</a></li><li><a href="#an-alias-is-the-same-type">An alias is the same type</a></li><li><a href="#fixed-arrays-and-generic-instances">Fixed arrays and generic instances</a></li><li><a href="#where-aliases-go">Where aliases go</a></li><li><a href="#rules">Rules</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>

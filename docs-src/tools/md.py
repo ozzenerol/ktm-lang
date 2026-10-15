@@ -93,13 +93,13 @@ def table(rows):
         for ch in line:
             if ch == "`":
                 code = not code
-            if ch == "|" and not code:
+            if ch == "|" and not code and not cur.endswith("\\"):
                 cells.append(cur.strip())
                 cur = ""
             else:
                 cur += ch
         cells.append(cur.strip())
-        return cells
+        return [c.replace("\\|", "|") for c in cells]
     head = cells(rows[0])
     body = [cells(r) for r in rows[2:]]
     h = "".join(f"<th>{inline(c)}</th>" for c in head)

@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Types and values - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html" class="on"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li></ol></aside>
+  <article class="prose">
+<h1>Types and values</h1>
+<p>The built-in types, their sizes and limits, how values convert from one type to another, and how to write numbers, characters and text in source code.</p>
+<h2 id="the-built-in-types"><a href="#the-built-in-types">The built-in types</a></h2>
+<div class="table"><table><thead><tr><th>Type</th><th>Size in bytes</th><th>What it is</th></tr></thead><tbody><tr><td><code>i8</code> <code>i16</code> <code>i32</code> <code>i64</code></td><td>1 2 4 8</td><td>Signed integers. <code>i64</code> is the default integer type</td></tr><tr><td><code>u8</code> <code>u16</code> <code>u32</code> <code>u64</code></td><td>1 2 4 8</td><td>Unsigned integers. <code>u8</code> is also the byte and character type</td></tr><tr><td><code>f64</code> <code>f32</code></td><td>8 4</td><td>Floating point numbers. <code>f64</code> is the default</td></tr><tr><td><code>bool</code></td><td>1</td><td><code>true</code> (1) or <code>false</code> (0)</td></tr><tr><td><code>void</code></td><td>0</td><td>No value: what a function that returns nothing returns</td></tr><tr><td><code>T *</code></td><td>8</td><td>A pointer to a <code>T</code>. <code>null</code> is the null pointer</td></tr><tr><td><code>T[]</code></td><td>16</td><td>A slice: a pointer and a length</td></tr><tr><td><code>String</code></td><td>24</td><td>An owned, growable string</td></tr></tbody></table></div>
+<p><code>sizeof</code> gives the size of a type or of an expression's type, in bytes.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    printf(<span class="s">&quot;%d %d %d %d\n&quot;</span>, <span class="k">sizeof</span>(<span class="t">i8</span>), <span class="k">sizeof</span>(<span class="t">i16</span>), <span class="k">sizeof</span>(<span class="t">i32</span>), <span class="k">sizeof</span>(<span class="t">i64</span>));
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, <span class="k">sizeof</span>(<span class="t">f32</span>), <span class="k">sizeof</span>(<span class="t">f64</span>), <span class="k">sizeof</span>(<span class="t">bool</span>));
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, <span class="k">sizeof</span>(<span class="t">u8</span> *), <span class="k">sizeof</span>(<span class="t">u8</span>[]), <span class="k">sizeof</span>(<span class="t">String</span>));
+}</code></pre>
+<pre class="out"><code>1 2 4 8
+4 8 1
+8 16 24</code></pre>
+<h2 id="integers"><a href="#integers">Integers</a></h2>
+<p><code>i64</code> is what you use unless there is a reason not to: an integer literal is an <code>i64</code>, arithmetic on smaller integers is done in <code>i64</code>, and <code>printf</code>'s <code>%d</code> prints all 64 bits.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> population = <span class="n">8100000000</span>;
+    <span class="t">i32</span> small = <span class="n">2000000000</span>;
+    <span class="t">u8</span> byte = <span class="n">200</span>;
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, population, small, byte);
+}</code></pre>
+<pre class="out"><code>8100000000 2000000000 200</code></pre>
+<h3 id="limits"><a href="#limits">Limits</a></h3>
+<p>The prelude, which every program sees without an import, names the smallest and largest value of each integer type.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    printf(<span class="s">&quot;i8:  %d .. %d\n&quot;</span>, I8_MIN, I8_MAX);
+    printf(<span class="s">&quot;i32: %d .. %d\n&quot;</span>, I32_MIN, I32_MAX);
+    printf(<span class="s">&quot;i64: %d .. %d\n&quot;</span>, I64_MIN, I64_MAX);
+    printf(<span class="s">&quot;u8:  0 .. %d\n&quot;</span>, U8_MAX);
+    printf(<span class="s">&quot;u32: 0 .. %u\n&quot;</span>, U32_MAX);
+}</code></pre>
+<pre class="out"><code>i8:  -128 .. 127
+i32: -2147483648 .. 2147483647
+i64: -9223372036854775808 .. 9223372036854775807
+u8:  0 .. 255
+u32: 0 .. 4294967295</code></pre>
+<h3 id="overflow-wraps"><a href="#overflow-wraps">Overflow wraps</a></h3>
+<p>Integer arithmetic wraps around at the type's size, as in C on every machine ktm runs on: there is no trap and no undefined behaviour to worry about.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">u8</span> b = <span class="n">255</span>;
+    b = b + <span class="n">1</span>;
+    <span class="t">i64</span> big = I64_MAX;
+    big = big + <span class="n">1</span>;
+    <span class="t">i8</span> small = <span class="n">127</span>;
+    small = small + <span class="n">1</span>;
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, b, big, small);
+}</code></pre>
+<pre class="out"><code>0 -9223372036854775808 -128</code></pre>
+<h3 id="division"><a href="#division">Division</a></h3>
+<p>Integer division rounds towards zero, and <code>%</code> takes the sign of the left side. Dividing by zero stops the program with a crash report that says where it happened.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, <span class="n">7</span> / <span class="n">2</span>, -<span class="n">7</span> / <span class="n">2</span>);
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, <span class="n">7</span> % <span class="n">3</span>, -<span class="n">7</span> % <span class="n">3</span>);
+}</code></pre>
+<pre class="out"><code>3 -3
+1 -1</code></pre>
+<h3 id="unsigned-values"><a href="#unsigned-values">Unsigned values</a></h3>
+<p>An unsigned type holds no sign. <code>%u</code> prints a value as unsigned; <code>%d</code> prints the same bits as signed.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">u64</span> all = U64_MAX;
+    printf(<span class="s">&quot;%u\n&quot;</span>, all);
+    printf(<span class="s">&quot;%d\n&quot;</span>, all);
+}</code></pre>
+<pre class="out"><code>18446744073709551615
+-1</code></pre>
+<p>Arithmetic on integers smaller than <code>i64</code> is done in <code>i64</code>, so <code>x - y</code> on two <code>u32</code> values below is -2. It wraps to the <code>u32</code> range only when it is stored in a <code>u32</code>. This differs from C, where the subtraction itself would wrap.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">u32</span> x = <span class="n">3</span>;
+    <span class="t">u32</span> y = <span class="n">5</span>;
+    printf(<span class="s">&quot;%d\n&quot;</span>, x - y);
+    <span class="t">u32</span> diff = x - y;
+    printf(<span class="s">&quot;%u\n&quot;</span>, diff);
+}</code></pre>
+<pre class="out"><code>-2
+4294967294</code></pre>
+<h2 id="floating-point-numbers"><a href="#floating-point-numbers">Floating point numbers</a></h2>
+<p><code>f64</code> is a double, <code>f32</code> a single-precision float. A literal with a <code>.</code> or an exponent is an <code>f64</code>.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">f64</span> third = <span class="n">1.0</span> / <span class="n">3.0</span>;
+    <span class="t">f32</span> small = <span class="n">1.0</span> / <span class="n">3.0</span>;
+    printf(<span class="s">&quot;%.17f\n&quot;</span>, third);
+    printf(<span class="s">&quot;%.17f\n&quot;</span>, small);
+    printf(<span class="s">&quot;%f %.1f %e\n&quot;</span>, <span class="n">2.5</span>, <span class="n">1e6</span>, <span class="n">0.000123</span>);
+}</code></pre>
+<pre class="out"><code>0.33333333333333331
+0.33333334326744080
+2.500000 1000000.0 1.230000e-04</code></pre>
+<p>Mixing an integer and a float gives a float. Dividing two integers stays an integer, so make one of them a float when you want the fraction.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> total = <span class="n">7</span>;
+    <span class="t">i64</span> count = <span class="n">2</span>;
+    printf(<span class="s">&quot;%d\n&quot;</span>, total / count);
+    printf(<span class="s">&quot;%.1f\n&quot;</span>, (<span class="t">f64</span>)total / count);
+    printf(<span class="s">&quot;%.1f\n&quot;</span>, total / <span class="n">2.0</span>);
+}</code></pre>
+<pre class="out"><code>3
+3.5
+3.5</code></pre>
+<p>Floats follow IEEE 754: dividing by zero gives an infinity, and a NaN compares unequal even to itself.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">f64</span> zero = <span class="n">0.0</span>;
+    <span class="t">f64</span> inf = <span class="n">1.0</span> / zero;
+    <span class="t">f64</span> nan = zero / zero;
+    printf(<span class="s">&quot;%f %f\n&quot;</span>, inf, -inf);
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, nan == nan, inf &gt; <span class="n">1e308</span>);
+}</code></pre>
+<pre class="out"><code>inf -inf
+0 1</code></pre>
+<h2 id="bool"><a href="#bool">bool</a></h2>
+<p>A <code>bool</code> is <code>true</code> (1) or <code>false</code> (0). Any value becomes a <code>bool</code> by being compared with 0, wherever the conversion happens: an assignment, an argument, a return, a cast.</p>
+<pre class="code run"><code><span class="t">bool</span> isSet(<span class="t">i64</span> flags, <span class="t">i64</span> bit) { <span class="k">return</span> flags &amp; bit; }
+
+<span class="t">void</span> main() {
+    <span class="t">bool</span> a = <span class="n">0x100</span>;          <span class="c">// true: the whole value counts, not its low byte</span>
+    <span class="t">bool</span> b = (<span class="t">bool</span>)<span class="n">0.5</span>;      <span class="c">// true: not 0.0</span>
+    <span class="t">bool</span> c = (<span class="t">bool</span>)(-<span class="n">1</span>);     <span class="c">// true</span>
+    <span class="t">u8</span> *p = <span class="k">null</span>;
+    <span class="t">bool</span> d = p;              <span class="c">// false: a null pointer</span>
+    printf(<span class="s">&quot;%d %d %d %d %d\n&quot;</span>, a, b, c, d, isSet(<span class="n">0x800</span>, <span class="n">0x800</span>));
+}</code></pre>
+<pre class="out"><code>1 1 1 0 1</code></pre>
+<p>Conditions (<code>if</code>, <code>while</code>, <code>&amp;&amp;</code>, <code>!</code>) take any number or pointer the same way: non-zero is true.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> count = <span class="n">3</span>;
+    <span class="t">u8</span> *name = <span class="s">&quot;ada&quot;</span>;
+    <span class="k">if</span> (count &amp;&amp; name) {
+        printf(<span class="s">&quot;both set\n&quot;</span>);
+    }
+    <span class="k">if</span> (!<span class="n">0</span>) {
+        printf(<span class="s">&quot;!0 is true\n&quot;</span>);
+    }
+}</code></pre>
+<pre class="out"><code>both set
+!0 is true</code></pre>
+<h2 id="null-true-and-false"><a href="#null-true-and-false">null, true and false</a></h2>
+<p><code>null</code> is the pointer that points nowhere. It can be assigned to any pointer type, and a pointer compares equal to it when it is unset.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">u8</span> *name = <span class="k">null</span>;
+    <span class="k">if</span> (name == <span class="k">null</span>) {
+        printf(<span class="s">&quot;no name yet\n&quot;</span>);
+    }
+    name = <span class="s">&quot;Ada&quot;</span>;
+    <span class="k">if</span> (name) {
+        printf(<span class="s">&quot;name: %s\n&quot;</span>, name);
+    }
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, <span class="k">true</span>, <span class="k">false</span>);
+}</code></pre>
+<pre class="out"><code>no name yet
+name: Ada
+1 0</code></pre>
+<h2 id="converting-between-types"><a href="#converting-between-types">Converting between types</a></h2>
+<h3 id="implicit-conversions"><a href="#implicit-conversions">Implicit conversions</a></h3>
+<p>A value converts to a wider type of the same kind without a cast: a smaller integer into a bigger one, an integer into a float, an <code>f32</code> into an <code>f64</code>, any pointer into <code>void *</code>.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">u8</span> b = <span class="n">200</span>;
+    <span class="t">i64</span> wide = b;
+    <span class="t">f64</span> f = wide;
+    <span class="t">i32</span> neg = -<span class="n">5</span>;
+    <span class="t">i64</span> alsoNeg = neg;
+    printf(<span class="s">&quot;%d %.1f %d\n&quot;</span>, wide, f, alsoNeg);
+}</code></pre>
+<pre class="out"><code>200 200.0 -5</code></pre>
+<p>A signed value keeps its sign when it gets wider (<code>-5</code> stays <code>-5</code>); an unsigned one is filled with zeros.</p>
+<h3 id="casts"><a href="#casts">Casts</a></h3>
+<p><code>(type)value</code> converts explicitly. Going to a narrower integer keeps the low bits; going from a float to an integer drops the fraction.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> big = <span class="n">300</span>;
+    <span class="t">u8</span> low = (<span class="t">u8</span>)big;
+    <span class="t">f64</span> price = <span class="n">9.99</span>;
+    <span class="t">i64</span> whole = (<span class="t">i64</span>)price;
+    <span class="t">i64</span> negWhole = (<span class="t">i64</span>)-<span class="n">2.7</span>;
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, low, whole, negWhole);
+}</code></pre>
+<pre class="out"><code>44 9 -2</code></pre>
+<p>A cast between pointer types changes how the same memory is read:</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">u32</span> word = <span class="n">0x04030201</span>;
+    <span class="t">u8</span> *bytes = (<span class="t">u8</span> *)&amp;word;
+    printf(<span class="s">&quot;%d %d %d %d\n&quot;</span>, bytes[<span class="n">0</span>], bytes[<span class="n">1</span>], bytes[<span class="n">2</span>], bytes[<span class="n">3</span>]);
+}</code></pre>
+<pre class="out"><code>1 2 3 4</code></pre>
+<p>The bytes come out lowest first because every machine ktm runs on is little-endian.</p>
+<h2 id="writing-numbers"><a href="#writing-numbers">Writing numbers</a></h2>
+<h3 id="integer-literals"><a href="#integer-literals">Integer literals</a></h3>
+<p>Decimal, hexadecimal (<code>0x</code>) or binary (<code>0b</code>). An <code>_</code> between two digits groups them, for reading.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> dec = <span class="n">42</span>, hex = <span class="n">0xFF</span>, bin = <span class="n">0b1010</span>;
+    <span class="t">i64</span> million = <span class="n">1_000_000</span>;
+    <span class="t">i64</span> mask = <span class="n">0xFF_FF</span>;
+    <span class="t">u32</span> flags = <span class="n">0b1000_0001</span>;
+    printf(<span class="s">&quot;%d %d %d %d %d %d\n&quot;</span>, dec, hex, bin, million, mask, flags);
+}</code></pre>
+<pre class="out"><code>42 255 10 1000000 65535 129</code></pre>
+<ul><li>A literal too big for <code>i64</code> is a <code>u64</code>: <code>18446744073709551615</code> is <code>U64_MAX</code>.</li><li><code>_</code> only goes between two digits: <code>_100</code> is a name, <code>1__0</code> and <code>1_</code> are errors.</li><li>There are no octal literals. A leading zero changes nothing: <code>0644</code> is six hundred and forty-four. ktm warns at such a literal and suggests writing it in hex.</li></ul>
+<p>A malformed number is an error that says what is wrong:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">void</span> main() {
+    <span class="t">i64</span> x = 0b102;
+}</code></pre>
+<pre class="out"><code>error:</code></pre>
+<h3 id="float-literals"><a href="#float-literals">Float literals</a></h3>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">f64</span> a = <span class="n">1.5</span>, b = <span class="n">1.5e3</span>, c = <span class="n">2e-3</span>, price = <span class="n">1_000.25</span>;
+    printf(<span class="s">&quot;%.1f %.1f %.3f %.2f\n&quot;</span>, a, b, c, price);
+    printf(<span class="s">&quot;%s %s\n&quot;</span>, <span class="k">typeof</span>(<span class="n">2</span>), <span class="k">typeof</span>(<span class="n">2.0</span>));
+}</code></pre>
+<pre class="out"><code>1.5 1500.0 0.002 1000.25
+i64 f64</code></pre>
+<h2 id="characters"><a href="#characters">Characters</a></h2>
+<p>A character constant is one character in single quotes. Its value is the character's code, so it can be used in arithmetic and compared.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> a = <span class="s">&#x27;A&#x27;</span>, newline = <span class="s">&#x27;\n&#x27;</span>, zero = <span class="s">&#x27;0&#x27;</span>;
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, a, newline, zero);
+    printf(<span class="s">&quot;%c%c%c\n&quot;</span>, a, a + <span class="n">1</span>, a + <span class="n">2</span>);
+    <span class="t">u8</span> c = <span class="s">&#x27;x&#x27;</span>;
+    printf(<span class="s">&quot;%c is a lower-case letter: %d\n&quot;</span>, c, c &gt;= <span class="s">&#x27;a&#x27;</span> &amp;&amp; c &lt;= <span class="s">&#x27;z&#x27;</span>);
+    printf(<span class="s">&quot;&#x27;7&#x27; is the digit %d\n&quot;</span>, <span class="s">&#x27;7&#x27;</span> - <span class="s">&#x27;0&#x27;</span>);
+}</code></pre>
+<pre class="out"><code>65 10 48
+ABC
+x is a lower-case letter: 1
+&#x27;7&#x27; is the digit 7</code></pre>
+<p>A character constant holds exactly one character (an escape counts as one). Two characters in quotes are an error: use a string, or an <a href="14-enums.html">enum</a> for a set of tags.</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">void</span> main() {
+    <span class="t">i64</span> c = <span class="s">&#x27;ab&#x27;</span>;
+}</code></pre>
+<pre class="out"><code>error:</code></pre>
+<h2 id="text"><a href="#text">Text</a></h2>
+<p>A string literal, in double quotes, is a <code>u8 *</code> to read-only bytes that end in a NUL (0). Wherever a slice is expected, it converts to a <code>u8[]</code> of the same bytes.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">u8</span> *greeting = <span class="s">&quot;hello&quot;</span>;
+    <span class="t">u8</span>[] view = <span class="s">&quot;hello&quot;</span>;
+    printf(<span class="s">&quot;%s %s %d\n&quot;</span>, greeting, view, view.len);
+    printf(<span class="s">&quot;%d\n&quot;</span>, <span class="k">sizeof</span>(<span class="s">&quot;abc&quot;</span>));     <span class="c">// the three bytes and the NUL</span>
+}</code></pre>
+<pre class="out"><code>hello hello 5
+4</code></pre>
+<p>Two literals next to each other are joined into one, which helps with long text:</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">u8</span> *msg = <span class="s">&quot;a long sentence written &quot;</span>
+              <span class="s">&quot;over two lines&quot;</span>;
+    printf(<span class="s">&quot;%s\n&quot;</span>, msg);
+}</code></pre>
+<pre class="out"><code>a long sentence written over two lines</code></pre>
+<h3 id="escapes"><a href="#escapes">Escapes</a></h3>
+<div class="table"><table><thead><tr><th>Escape</th><th>Means</th></tr></thead><tbody><tr><td><code>\n</code> <code>\t</code> <code>\r</code> <code>\b</code> <code>\f</code> <code>\v</code> <code>\a</code></td><td>The C control characters</td></tr><tr><td><code>\\</code> <code>\&#x27;</code> <code>\&quot;</code></td><td>A backslash, a quote</td></tr><tr><td><code>\xHH</code></td><td>A byte in hex, at most two digits: <code>&quot;\x01b&quot;</code> is the byte 1, then <code>b</code></td></tr><tr><td><code>\0</code> to <code>\7</code></td><td>An octal escape of up to three digits: <code>&quot;\033&quot;</code> is ESC</td></tr><tr><td><code>\d</code></td><td>A <code>$</code></td></tr></tbody></table></div>
+<pre class="code run"><code><span class="t">void</span> main() {
+    printf(<span class="s">&quot;tab:[\t] quote:[\&quot;] backslash:[\\]\n&quot;</span>);
+    printf(<span class="s">&quot;hex:[\x41\x42] octal:[\101] dollar:[\d]\n&quot;</span>);
+}</code></pre>
+<pre class="out"><code>tab:[	] quote:[&quot;] backslash:[\]
+hex:[AB] octal:[A] dollar:[$]</code></pre>
+<p>A string literal can't be changed: writing into one is an error when the compiler sees it, and a crash when it doesn't. Copy it into a buffer or a <code>String</code> first; <a href="11-strings.html">Strings</a> shows how.</p>
+<h2 id="asking-about-a-type"><a href="#asking-about-a-type">Asking about a type</a></h2>
+<p><code>typeof(x)</code> is the name of an expression's type, as a string, made at compile time. <code>sizeof</code> and <code>alignof</code> give a size and an alignment in bytes.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">u8</span> small = <span class="n">1</span>;
+    <span class="t">i64</span> n = <span class="n">5</span>;
+    printf(<span class="s">&quot;%s %s %s\n&quot;</span>, <span class="k">typeof</span>(small), <span class="k">typeof</span>(small + <span class="n">1</span>), <span class="k">typeof</span>(<span class="s">&quot;hi&quot;</span>));
+    printf(<span class="s">&quot;%s %s\n&quot;</span>, <span class="k">typeof</span>(n * <span class="n">2.0</span>), <span class="k">typeof</span>(&amp;n));
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, <span class="k">sizeof</span>(small), <span class="k">sizeof</span>(n), alignof(<span class="t">f64</span>));
+}</code></pre>
+<pre class="out"><code>u8 i64 u8[3]
+f64 i64 *
+1 8 8</code></pre>
+<p><code>small + 1</code> is an <code>i64</code> because arithmetic on integers smaller than <code>i64</code> is done in <code>i64</code>.</p>
+    <nav class="pager"><a class="prev" href="01-first-program.html"><span>Previous</span>A first program</a><a class="next" href="03-variables.html"><span>Next</span>Variables</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#the-built-in-types">The built-in types</a></li><li><a href="#integers">Integers</a></li><li><a href="#floating-point-numbers">Floating point numbers</a></li><li><a href="#bool">bool</a></li><li><a href="#null-true-and-false">null, true and false</a></li><li><a href="#converting-between-types">Converting between types</a></li><li><a href="#writing-numbers">Writing numbers</a></li><li><a href="#characters">Characters</a></li><li><a href="#text">Text</a></li><li><a href="#asking-about-a-type">Asking about a type</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>

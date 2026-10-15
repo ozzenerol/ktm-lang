@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Run every example of the docs (docs-src/language/*.md, docs-src/std/*.md).
 
-A ```ktm run block is compiled and run, ahead of time and in the JIT; what it
+Each example is the file example.ktm in a directory of its own (so what a
+program prints about its own file is the same on every run). A ```ktm run
+block is compiled and run, ahead of time and in the JIT; what it
 prints (stdout, then stderr) must equal the ```output block after it. A
 ```ktm error block must fail to compile, and ktm's output must contain the
 ```output block's text. Exit code 1 when anything fails.
@@ -53,8 +55,6 @@ def check_one(args, path, ex):
         return where, "a ```ktm run/error block with no ```output block after it"
     ktm = [args.ktm] + ([f"--install-dir={args.install_dir}"] if args.install_dir else [])
     with tempfile.TemporaryDirectory(prefix="ktm-doc-") as tmp:
-        # compiled by its plain name in its directory, so the file names a
-        # program prints (e.file, @caller, uncaught errors) are example.ktm
         src = os.path.join(tmp, "example.ktm")
         open(src, "w").write(code + "\n")
         if kind == "error":
@@ -66,7 +66,7 @@ def check_one(args, path, ex):
             return where, None
         want = want.rstrip("\n")
         if not args.jit_only:
-            rc, out = run(ktm + ["example.ktm", "-o", os.path.join(tmp, "example")], tmp)
+            rc, out = run(ktm + ["example.ktm", "-o", "example"], tmp)
             if rc != 0:
                 return where, f"doesn't compile:\n{out}"
             rc, out = run([os.path.join(tmp, "example")], tmp)

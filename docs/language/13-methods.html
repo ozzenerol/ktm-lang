@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Methods - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html" class="on"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li></ol></aside>
+  <article class="prose">
+<h1>Methods</h1>
+<p>A method is a function that belongs to a struct: it is named <code>Type.name</code>, written outside the struct, and called on a value with <code>value.name(...)</code>. A struct can also extend one other struct and get its fields and methods. This chapter covers defining and calling methods, <code>self</code>, the conventions for making and freeing values, inheritance, hiding a method, and why there is no virtual dispatch (and what to do instead). ktm has no classes and no constructors: a struct is data, and its methods are functions.</p>
+<h2 id="defining-a-method"><a href="#defining-a-method">Defining a method</a></h2>
+<p>A method is written like a function whose name is the struct's name, a dot, and the method's name. Inside it, <code>self</code> is a pointer to the value it was called on.</p>
+<pre class="code run"><code><span class="k">struct</span> Account {
+    <span class="t">u8</span> *owner;
+    <span class="t">i64</span> balance;
+};
+
+<span class="t">void</span> Account.deposit(<span class="t">i64</span> amount) {
+    self.balance += amount;
+}
+
+<span class="t">void</span> Account.print() {
+    printf(<span class="s">&quot;%s: %d\n&quot;</span>, self.owner, self.balance);
+}
+
+<span class="t">i32</span> main() {
+    Account a = {<span class="s">&quot;ann&quot;</span>, <span class="n">0</span>};
+    a.deposit(<span class="n">100</span>);
+    a.deposit(<span class="n">25</span>);
+    a.print();
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>ann: 125</code></pre>
+<p>Because <code>self</code> is a pointer, a method changes the caller's value, not a copy: <code>a.deposit(100)</code> changed <code>a</code>.</p>
+<p>A method can return a value like any function:</p>
+<pre class="code run"><code><span class="k">struct</span> Account {
+    <span class="t">u8</span> *owner;
+    <span class="t">i64</span> balance;
+};
+
+<span class="t">bool</span> Account.withdraw(<span class="t">i64</span> amount) {
+    <span class="k">if</span> (amount &gt; self.balance) {
+        <span class="k">return</span> <span class="k">false</span>;
+    }
+    self.balance -= amount;
+    <span class="k">return</span> <span class="k">true</span>;
+}
+
+<span class="t">i32</span> main() {
+    Account a = {<span class="s">&quot;ann&quot;</span>, <span class="n">100</span>};
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, a.withdraw(<span class="n">30</span>), a.withdraw(<span class="n">500</span>));
+    printf(<span class="s">&quot;%d\n&quot;</span>, a.balance);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>1 0
+70</code></pre>
+<h2 id="calling-methods"><a href="#calling-methods">Calling methods</a></h2>
+<p>A method is called on a struct value or on a pointer to one, the same way:</p>
+<pre class="code run"><code><span class="k">struct</span> Counter { <span class="t">i64</span> n; };
+
+<span class="t">void</span> Counter.bump() {
+    self.n++;
+}
+
+<span class="t">i32</span> main() {
+    Counter c = {<span class="n">0</span>};
+    Counter *p = &amp;c;
+    c.bump();
+    p.bump();
+    p-&gt;bump();
+    printf(<span class="s">&quot;%d\n&quot;</span>, c.n);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>3</code></pre>
+<p>It can be called on an element of an array, on a field, or on a struct a function just returned:</p>
+<pre class="code run"><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+
+<span class="t">i64</span> Point.sum() {
+    <span class="k">return</span> self.x + self.y;
+}
+
+<span class="k">struct</span> Segment { Point a, b; };
+
+Point make(<span class="t">i64</span> x, <span class="t">i64</span> y) {
+    Point p = {x, y};
+    <span class="k">return</span> p;
+}
+
+<span class="t">i32</span> main() {
+    Point ps[<span class="n">2</span>] = {{<span class="n">1</span>, <span class="n">2</span>}, {<span class="n">3</span>, <span class="n">4</span>}};
+    Segment s = {{<span class="n">5</span>, <span class="n">6</span>}, {<span class="n">7</span>, <span class="n">8</span>}};
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, ps[<span class="n">1</span>].sum(), s.b.sum(), make(<span class="n">10</span>, <span class="n">20</span>).sum());
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>7 15 30</code></pre>
+<p>A method that returns <code>self</code> lets calls be chained:</p>
+<pre class="code run"><code><span class="k">struct</span> Builder { <span class="t">i64</span> total; };
+
+Builder *Builder.add(<span class="t">i64</span> n) {
+    self.total += n;
+    <span class="k">return</span> self;
+}
+
+<span class="t">i32</span> main() {
+    Builder b = {<span class="n">0</span>};
+    b.add(<span class="n">1</span>).add(<span class="n">2</span>).add(<span class="n">3</span>);
+    printf(<span class="s">&quot;%d\n&quot;</span>, b.total);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>6</code></pre>
+<p>Methods take everything a function takes: default arguments, overloads (see <a href="18-overloading.html">Overloading</a>) and variable arguments (see <a href="19-varargs.html">Varargs</a>).</p>
+<pre class="code run"><code><span class="k">struct</span> Door { <span class="t">bool</span> open; <span class="t">i64</span> angle; };
+
+<span class="t">void</span> Door.swing(<span class="t">i64</span> angle = <span class="n">90</span>) {
+    self.open = angle &gt; <span class="n">0</span>;
+    self.angle = angle;
+}
+
+<span class="t">i32</span> main() {
+    Door d;
+    d.swing();
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, d.open, d.angle);
+    d.swing(<span class="n">0</span>);
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, d.open, d.angle);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>1 90
+0 0</code></pre>
+<h2 id="self"><a href="#self"><code>self</code></a></h2>
+<p><code>self</code> is a pointer to the value; its fields are reached with <code>self.field</code>. It is fixed for the whole call: assigning to it is an error.</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="k">struct</span> Point { <span class="t">i64</span> x; };
+
+<span class="t">void</span> Point.reset() {
+    self = <span class="k">null</span>;
+}
+
+<span class="t">i32</span> main() {
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>cannot assign to const &#x27;self&#x27;</code></pre>
+<p><code>*self</code> is the value itself, for when a copy is wanted:</p>
+<pre class="code run"><code><span class="k">struct</span> Point { <span class="t">i64</span> x, y; };
+
+Point Point.mirrored() {
+    Point m = *self;
+    m.x = -m.x;
+    <span class="k">return</span> m;
+}
+
+<span class="t">i32</span> main() {
+    Point p = {<span class="n">3</span>, <span class="n">4</span>};
+    Point q = p.mirrored();
+    printf(<span class="s">&quot;(%d, %d) (%d, %d)\n&quot;</span>, p.x, p.y, q.x, q.y);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>(3, 4) (-3, 4)</code></pre>
+<p>A method calls the struct's other methods through <code>self</code>:</p>
+<pre class="code run"><code><span class="k">struct</span> Temp { <span class="t">f64</span> celsius; };
+
+<span class="t">f64</span> Temp.fahrenheit() {
+    <span class="k">return</span> self.celsius * <span class="n">9.0</span> / <span class="n">5.0</span> + <span class="n">32.0</span>;
+}
+
+<span class="t">void</span> Temp.print() {
+    printf(<span class="s">&quot;%.1f C = %.1f F\n&quot;</span>, self.celsius, self.fahrenheit());
+}
+
+<span class="t">i32</span> main() {
+    Temp t = {<span class="n">21.5</span>};
+    t.print();
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>21.5 C = 70.7 F</code></pre>
+<h2 id="declaring-a-method-ahead"><a href="#declaring-a-method-ahead">Declaring a method ahead</a></h2>
+<p>A method's prototype, <code>Type.name(...);</code> without a body, lets it be called before it is defined:</p>
+<pre class="code run"><code><span class="k">struct</span> Point { <span class="t">i64</span> x; };
+
+<span class="t">void</span> Point.show();
+
+<span class="t">i32</span> main() {
+    Point a = {<span class="n">4</span>};
+    a.show();
+    <span class="k">return</span> <span class="n">0</span>;
+}
+
+<span class="t">void</span> Point.show() {
+    printf(<span class="s">&quot;%d\n&quot;</span>, self.x);
+}</code></pre>
+<pre class="out"><code>4</code></pre>
+<h2 id="making-and-freeing-values"><a href="#making-and-freeing-values">Making and freeing values</a></h2>
+<p>There are no constructors or destructors. By convention a plain function makes the value (often <code>new</code> or <code>open</code> in a module, see <a href="22-modules-and-packages.html">Modules and packages</a>), and a <code>free()</code> method releases what it holds:</p>
+<pre class="code run"><code><span class="k">import</span> mem;
+
+<span class="k">struct</span> Buffer {
+    <span class="t">u8</span> *data;
+    <span class="t">i64</span> len;
+};
+
+Buffer bufferNew(<span class="t">i64</span> size) {
+    Buffer b = {mem.allocZero(size), size};
+    <span class="k">return</span> b;
+}
+
+<span class="t">void</span> Buffer.free() {
+    mem.free(self.data);
+    self.data = <span class="k">null</span>;
+    printf(<span class="s">&quot;freed %d bytes\n&quot;</span>, self.len);
+}
+
+<span class="t">i32</span> main() {
+    Buffer b = bufferNew(<span class="n">64</span>);
+    b.data[<span class="n">0</span>] = <span class="s">&#x27;x&#x27;</span>;
+    printf(<span class="s">&quot;%c\n&quot;</span>, b.data[<span class="n">0</span>]);
+    b.free();
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>x
+freed 64 bytes</code></pre>
+<p>A value with a <code>free()</code> method can be declared with <code>ad</code> instead of a type's plain declaration: <code>free()</code> is then called for it when its block ends, however the block is left (see <a href="16-defer-and-ad.html">defer and ad</a>).</p>
+<pre class="code run"><code><span class="k">import</span> mem;
+
+<span class="k">struct</span> Buffer {
+    <span class="t">u8</span> *data;
+    <span class="t">i64</span> len;
+};
+
+Buffer bufferNew(<span class="t">i64</span> size) {
+    Buffer b = {mem.allocZero(size), size};
+    <span class="k">return</span> b;
+}
+
+<span class="t">void</span> Buffer.free() {
+    mem.free(self.data);
+    printf(<span class="s">&quot;freed %d bytes\n&quot;</span>, self.len);
+}
+
+<span class="t">i32</span> main() {
+    <span class="k">ad</span> Buffer b = bufferNew(<span class="n">16</span>);
+    b.data[<span class="n">0</span>] = <span class="s">&#x27;y&#x27;</span>;
+    printf(<span class="s">&quot;%c\n&quot;</span>, b.data[<span class="n">0</span>]);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>y
+freed 16 bytes</code></pre>
+<p>A method that sets fields up can stand in for a constructor too, called on a zeroed value:</p>
+<pre class="code run"><code><span class="k">struct</span> Range { <span class="t">i64</span> lo, hi, step; };
+
+<span class="t">void</span> Range.init(<span class="t">i64</span> lo, <span class="t">i64</span> hi, <span class="t">i64</span> step = <span class="n">1</span>) {
+    self.lo = lo;
+    self.hi = hi;
+    self.step = step;
+}
+
+<span class="t">i64</span> Range.count() {
+    <span class="k">return</span> (self.hi - self.lo + self.step - <span class="n">1</span>) / self.step;
+}
+
+<span class="t">i32</span> main() {
+    Range r;
+    r.init(<span class="n">0</span>, <span class="n">10</span>, <span class="n">3</span>);
+    printf(<span class="s">&quot;%d\n&quot;</span>, r.count());
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>4</code></pre>
+<h2 id="inheritance"><a href="#inheritance">Inheritance</a></h2>
+<p><code>struct Derived : Base { ... };</code> makes a struct that starts with all of <code>Base</code>'s fields, followed by its own. It also has <code>Base</code>'s methods.</p>
+<pre class="code run"><code><span class="k">struct</span> User {
+    <span class="t">u8</span> *name;
+    <span class="t">i64</span> age;
+};
+
+<span class="k">struct</span> Admin : User {
+    <span class="t">i64</span> level;
+};
+
+<span class="t">void</span> User.describe() {
+    printf(<span class="s">&quot;%s is %d\n&quot;</span>, self.name, self.age);
+}
+
+<span class="t">void</span> User.birthday() {
+    self.age++;
+}
+
+<span class="t">i32</span> main() {
+    Admin a;
+    a.name = <span class="s">&quot;bob&quot;</span>;
+    a.age = <span class="n">40</span>;
+    a.level = <span class="n">2</span>;
+    a.birthday();
+    a.describe();
+    printf(<span class="s">&quot;%d bytes\n&quot;</span>, <span class="k">sizeof</span>(Admin));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>bob is 41
+24 bytes</code></pre>
+<p>Because a derived struct begins with its base, a pointer to it can be used wherever a pointer to the base is expected:</p>
+<pre class="code run"><code><span class="k">struct</span> User { <span class="t">u8</span> *name; <span class="t">i64</span> age; };
+<span class="k">struct</span> Admin : User { <span class="t">i64</span> level; };
+
+<span class="t">void</span> greet(User *u) {
+    printf(<span class="s">&quot;hello %s\n&quot;</span>, u.name);
+}
+
+<span class="t">i32</span> main() {
+    Admin a;
+    a.name = <span class="s">&quot;bob&quot;</span>;
+    a.level = <span class="n">3</span>;
+    greet(&amp;a);
+    User *u = &amp;a;
+    printf(<span class="s">&quot;%s\n&quot;</span>, u.name);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>hello bob
+bob</code></pre>
+<p>Going the other way, from a base pointer to a derived one, is a plain conversion: it is only right when the value really is the derived struct.</p>
+<pre class="code run"><code><span class="k">struct</span> User { <span class="t">u8</span> *name; };
+<span class="k">struct</span> Admin : User { <span class="t">i64</span> level; };
+
+<span class="t">void</span> show(User *u, <span class="t">bool</span> isAdmin) {
+    <span class="k">if</span> (isAdmin) {
+        Admin *a = u;
+        printf(<span class="s">&quot;%s, level %d\n&quot;</span>, a.name, a.level);
+    } <span class="k">else</span> {
+        printf(<span class="s">&quot;%s\n&quot;</span>, u.name);
+    }
+}
+
+<span class="t">i32</span> main() {
+    Admin a;
+    a.name = <span class="s">&quot;bob&quot;</span>;
+    a.level = <span class="n">3</span>;
+    User u = {<span class="s">&quot;ann&quot;</span>};
+    show(&amp;a, <span class="k">true</span>);
+    show(&amp;u, <span class="k">false</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>bob, level 3
+ann</code></pre>
+<p>The chain can go on: a struct can extend one that extends another.</p>
+<pre class="code run"><code><span class="k">struct</span> Animal { <span class="t">u8</span> *name; };
+<span class="k">struct</span> Dog : Animal { <span class="t">i64</span> tricks; };
+<span class="k">struct</span> Puppy : Dog { <span class="t">i64</span> ageWeeks; };
+
+<span class="t">void</span> Animal.hello() {
+    printf(<span class="s">&quot;I am %s\n&quot;</span>, self.name);
+}
+
+<span class="t">i32</span> main() {
+    Puppy p;
+    p.name = <span class="s">&quot;rex&quot;</span>;
+    p.tricks = <span class="n">2</span>;
+    p.ageWeeks = <span class="n">9</span>;
+    p.hello();
+    printf(<span class="s">&quot;%d %d, %d bytes\n&quot;</span>, p.tricks, p.ageWeeks, <span class="k">sizeof</span>(Puppy));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>I am rex
+2 9, 24 bytes</code></pre>
+<ul><li>A struct extends at most one base.</li><li>The base's fields come first, in its layout; the derived struct's follow.</li><li>A derived struct initialised with <code>{...}</code> takes the base's fields first, then its own.</li></ul>
+<h2 id="hiding-a-base-method"><a href="#hiding-a-base-method">Hiding a base method</a></h2>
+<p>A method on the derived struct with the same name as the base's hides it. <code>Base.name(self)</code> still calls the base's version, for a method that adds to it:</p>
+<pre class="code run"><code><span class="k">struct</span> User { <span class="t">u8</span> *name; };
+<span class="k">struct</span> Admin : User { <span class="t">i64</span> level; };
+
+<span class="t">void</span> User.describe() {
+    printf(<span class="s">&quot;user %s\n&quot;</span>, self.name);
+}
+
+<span class="t">void</span> Admin.describe() {
+    printf(<span class="s">&quot;admin %d, &quot;</span>, self.level);
+    User.describe(self);
+}
+
+<span class="t">i32</span> main() {
+    Admin a;
+    a.name = <span class="s">&quot;bob&quot;</span>;
+    a.level = <span class="n">2</span>;
+    a.describe();
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>admin 2, user bob</code></pre>
+<h2 id="no-virtual-dispatch"><a href="#no-virtual-dispatch">No virtual dispatch</a></h2>
+<p>Which method runs is decided by the type the compiler sees, never at run time. Through a <code>User *</code>, the call is <code>User.describe</code>, even when the value is an <code>Admin</code>:</p>
+<pre class="code run"><code><span class="k">struct</span> User { <span class="t">u8</span> *name; };
+<span class="k">struct</span> Admin : User { <span class="t">i64</span> level; };
+
+<span class="t">void</span> User.describe() {
+    printf(<span class="s">&quot;user %s\n&quot;</span>, self.name);
+}
+
+<span class="t">void</span> Admin.describe() {
+    printf(<span class="s">&quot;admin %s\n&quot;</span>, self.name);
+}
+
+<span class="t">i32</span> main() {
+    Admin a;
+    a.name = <span class="s">&quot;bob&quot;</span>;
+    a.describe();
+    User *u = &amp;a;
+    u.describe();
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>admin bob
+user bob</code></pre>
+<p>For behaviour chosen at run time, put a function pointer in the struct (see <a href="20-function-pointers.html">Function pointers</a>). Each value carries the function it uses:</p>
+<pre class="code run"><code><span class="k">struct</span> Shape {
+    <span class="t">u8</span> *name;
+    fn(Shape *) <span class="t">f64</span> area;
+};
+
+<span class="k">struct</span> Circle : Shape { <span class="t">f64</span> r; };
+<span class="k">struct</span> Rect : Shape { <span class="t">f64</span> w, h; };
+
+<span class="t">f64</span> circleArea(Shape *s) {
+    Circle *c = s;
+    <span class="k">return</span> <span class="n">3.14159</span> * c.r * c.r;
+}
+
+<span class="t">f64</span> rectArea(Shape *s) {
+    Rect *r = s;
+    <span class="k">return</span> r.w * r.h;
+}
+
+<span class="t">i32</span> main() {
+    Circle c;
+    c.name = <span class="s">&quot;circle&quot;</span>;
+    c.area = &amp;circleArea;
+    c.r = <span class="n">1.0</span>;
+    Rect r;
+    r.name = <span class="s">&quot;rect&quot;</span>;
+    r.area = &amp;rectArea;
+    r.w = <span class="n">2.0</span>;
+    r.h = <span class="n">3.0</span>;
+    Shape *shapes[<span class="n">2</span>] = {&amp;c, &amp;r};
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">2</span>; i++) {
+        Shape *s = shapes[i];
+        printf(<span class="s">&quot;%s: %.2f\n&quot;</span>, s.name, s.area(s));
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>circle: 3.14
+rect: 6.00</code></pre>
+<h2 id="a-method-is-a-function"><a href="#a-method-is-a-function">A method is a function</a></h2>
+<p><code>Type.name</code> is an ordinary function whose first parameter is <code>self</code>. It can be called that way too, and <code>&amp;Type.name</code> is its address, a <code>fn(Type *, ...)</code> like any other function's:</p>
+<pre class="code run"><code><span class="k">struct</span> User { <span class="t">u8</span> *name; };
+
+<span class="t">void</span> User.hello() {
+    printf(<span class="s">&quot;hello %s\n&quot;</span>, self.name);
+}
+
+<span class="t">void</span> each(User[] users, fn(User *) <span class="t">void</span> f) {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; users.len; i++) {
+        f(&amp;users[i]);
+    }
+}
+
+<span class="t">i32</span> main() {
+    User all[<span class="n">2</span>] = {{<span class="s">&quot;ann&quot;</span>}, {<span class="s">&quot;bob&quot;</span>}};
+    User.hello(&amp;all[<span class="n">0</span>]);
+    each(all, &amp;User.hello);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>hello ann
+hello ann
+hello bob</code></pre>
+<p>There are no bound methods: <code>u.hello</code> without parentheses is an error.</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="k">struct</span> User { <span class="t">u8</span> *name; };
+
+<span class="t">void</span> User.hello() {
+}
+
+<span class="t">i32</span> main() {
+    User u;
+    <span class="k">auto</span> f = u.hello;
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>is a method: call it with `(...)`, or take its address with `&amp;User.hello`</code></pre>
+<h2 id="unions"><a href="#unions">Unions</a></h2>
+<p>A union can have methods as well; <code>self</code> points at the union:</p>
+<pre class="code run"><code><span class="k">union</span> Bits {
+    <span class="t">i64</span> i;
+    <span class="t">f64</span> f;
+};
+
+<span class="t">i64</span> Bits.exponent() {
+    <span class="k">return</span> (self.i &gt;&gt; <span class="n">52</span>) &amp; <span class="n">0x7FF</span>;
+}
+
+<span class="t">i32</span> main() {
+    Bits b;
+    b.f = <span class="n">8.0</span>;
+    printf(<span class="s">&quot;%d\n&quot;</span>, b.exponent() - <span class="n">1023</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>3</code></pre>
+<h2 id="what-isn-t-allowed"><a href="#what-isn-t-allowed">What isn't allowed</a></h2>
+<p>A method can't have the name of one of the struct's fields (inherited ones included):</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="k">struct</span> Point { <span class="t">i64</span> x; };
+
+<span class="t">void</span> Point.x() {
+}
+
+<span class="t">i32</span> main() {
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>has a field named `x`: a method cannot have the same name</code></pre>
+<p>Calling a field as if it were a method says so:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="k">struct</span> Box { <span class="t">i64</span> len; };
+
+<span class="t">i32</span> main() {
+    Box b;
+    <span class="k">return</span> b.len();
+}</code></pre>
+<pre class="out"><code>`len` is a field, not a method: read it without `()`</code></pre>
+<p>Only the module that defines a type can give it methods (see <a href="22-modules-and-packages.html">Modules and packages</a>):</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="k">import</span> json;
+
+<span class="t">void</span> json.Value.dump() {
+}
+
+<span class="t">i32</span> main() {
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>can only be defined in the module that defines it</code></pre>
+<h2 id="rules"><a href="#rules">Rules</a></h2>
+<ul><li>A method is <code>Ret Type.name(params) { ... }</code>, written outside the struct, for a struct or a union.</li><li><code>self</code> is a pointer to the value the method was called on, and can't be reassigned.</li><li><code>v.name(...)</code> works on a value, a pointer, an array element, a field or a returned struct.</li><li>Default arguments, overloads and varargs work as for functions.</li><li><code>struct D : B</code> extends one struct: <code>D</code> starts with <code>B</code>'s fields, has <code>B</code>'s methods, and a <code>D *</code> converts to a <code>B *</code>.</li><li>A derived struct's method of the same name hides the base's; <code>B.name(self)</code> calls the base's.</li><li>The call is chosen by the static type: no virtual dispatch. Use function pointers for that.</li><li><code>&amp;Type.name</code> is the method as a function whose first parameter is <code>self</code>; there are no bound methods.</li><li>A method can't be named like a field, and only the defining module adds methods to a type.</li></ul>
+    <nav class="pager"><a class="prev" href="12-structs-and-unions.html"><span>Previous</span>Structs and unions</a><a class="next" href="14-enums.html"><span>Next</span>Enums</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#defining-a-method">Defining a method</a></li><li><a href="#calling-methods">Calling methods</a></li><li><a href="#self">self</a></li><li><a href="#declaring-a-method-ahead">Declaring a method ahead</a></li><li><a href="#making-and-freeing-values">Making and freeing values</a></li><li><a href="#inheritance">Inheritance</a></li><li><a href="#hiding-a-base-method">Hiding a base method</a></li><li><a href="#no-virtual-dispatch">No virtual dispatch</a></li><li><a href="#a-method-is-a-function">A method is a function</a></li><li><a href="#unions">Unions</a></li><li><a href="#what-isn-t-allowed">What isn&#x27;t allowed</a></li><li><a href="#rules">Rules</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>

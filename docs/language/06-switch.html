@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>switch - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html" class="on"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li></ol></aside>
+  <article class="prose">
+<h1>switch</h1>
+<p><code>switch</code> picks one of several branches by a value. It looks like C's, with four differences: cases don't fall through into each other, a case can be a range, you can switch on text, and an explicit <code>fallthrough</code> is there for the rare case you want it.</p>
+<h2 id="the-basics"><a href="#the-basics">The basics</a></h2>
+<p>The value is compared with each <code>case</code>; the matching case runs. <code>default</code> runs when none matches. A case ends where the next one starts, so no <code>break</code> is needed.</p>
+<pre class="code run"><code><span class="t">void</span> describe(<span class="t">i64</span> n) {
+    <span class="k">switch</span> (n) {
+        <span class="k">case</span> <span class="n">0</span>: printf(<span class="s">&quot;%d: zero\n&quot;</span>, n);
+        <span class="k">case</span> <span class="n">1</span>: printf(<span class="s">&quot;%d: one\n&quot;</span>, n);
+        <span class="k">default</span>: printf(<span class="s">&quot;%d: many\n&quot;</span>, n);
+    }
+}
+
+<span class="t">void</span> main() {
+    describe(<span class="n">0</span>);
+    describe(<span class="n">1</span>);
+    describe(<span class="n">7</span>);
+}</code></pre>
+<pre class="out"><code>0: zero
+1: one
+7: many</code></pre>
+<p>In C, <code>describe(0)</code> would print all three lines. In ktm each case stands alone.</p>
+<p>Without a <code>default</code>, a value that matches no case does nothing:</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">4</span>; i++) {
+        <span class="k">switch</span> (i) {
+            <span class="k">case</span> <span class="n">1</span>: printf(<span class="s">&quot;one &quot;</span>);
+            <span class="k">case</span> <span class="n">3</span>: printf(<span class="s">&quot;three &quot;</span>);
+        }
+    }
+    printf(<span class="s">&quot;\n&quot;</span>);
+}</code></pre>
+<pre class="out"><code>one three </code></pre>
+<p>The parentheses are optional, as for <code>if</code>:</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> n = <span class="n">2</span>;
+    <span class="k">switch</span> n {
+        <span class="k">case</span> <span class="n">2</span>: printf(<span class="s">&quot;two\n&quot;</span>);
+        <span class="k">default</span>: printf(<span class="s">&quot;other\n&quot;</span>);
+    }
+}</code></pre>
+<pre class="out"><code>two</code></pre>
+<h2 id="break"><a href="#break">break</a></h2>
+<p><code>break</code> leaves the switch early, from the middle of a case:</p>
+<pre class="code run"><code><span class="t">void</span> check(<span class="t">i64</span> n) {
+    <span class="k">switch</span> (n) {
+        <span class="k">default</span>:
+            <span class="k">if</span> (n &lt; <span class="n">0</span>) {
+                printf(<span class="s">&quot;%d: negative, stop\n&quot;</span>, n);
+                <span class="k">break</span>;
+            }
+            printf(<span class="s">&quot;%d: fine\n&quot;</span>, n);
+    }
+}
+
+<span class="t">void</span> main() {
+    check(-<span class="n">3</span>);
+    check(<span class="n">4</span>);
+}</code></pre>
+<pre class="out"><code>-3: negative, stop
+4: fine</code></pre>
+<p>Inside a loop, <code>break</code> in a switch leaves the switch, not the loop; <code>continue</code> goes to the loop's next pass.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">5</span>; i++) {
+        <span class="k">switch</span> (i) {
+            <span class="k">case</span> <span class="n">1</span>: <span class="k">continue</span>;
+            <span class="k">case</span> <span class="n">3</span>: <span class="k">break</span>;
+            <span class="k">default</span>: printf(<span class="s">&quot;%d &quot;</span>, i);
+        }
+        printf(<span class="s">&quot;| &quot;</span>);
+    }
+    printf(<span class="s">&quot;\n&quot;</span>);
+}</code></pre>
+<pre class="out"><code>0 | 2 | | 4 | </code></pre>
+<h2 id="several-values-one-body"><a href="#several-values-one-body">Several values, one body</a></h2>
+<p>Labels stacked with nothing between them share the code after them.</p>
+<pre class="code run"><code><span class="t">u8</span> *dayType(<span class="t">i64</span> day) {
+    <span class="k">switch</span> (day) {
+        <span class="k">case</span> <span class="n">0</span>:
+        <span class="k">case</span> <span class="n">6</span>:
+            <span class="k">return</span> <span class="s">&quot;weekend&quot;</span>;
+        <span class="k">default</span>:
+            <span class="k">return</span> <span class="s">&quot;weekday&quot;</span>;
+    }
+}
+
+<span class="t">void</span> main() {
+    printf(<span class="s">&quot;%s %s %s\n&quot;</span>, dayType(<span class="n">0</span>), dayType(<span class="n">3</span>), dayType(<span class="n">6</span>));
+}</code></pre>
+<pre class="out"><code>weekend weekday weekend</code></pre>
+<h2 id="ranges"><a href="#ranges">Ranges</a></h2>
+<p><code>case lo ... hi:</code> matches every value from <code>lo</code> to <code>hi</code>, both included.</p>
+<pre class="code run"><code><span class="t">void</span> grade(<span class="t">i64</span> score) {
+    <span class="k">switch</span> (score) {
+        <span class="k">case</span> <span class="n">90</span> ... <span class="n">100</span>: printf(<span class="s">&quot;%d: A\n&quot;</span>, score);
+        <span class="k">case</span> <span class="n">80</span> ... <span class="n">89</span>:  printf(<span class="s">&quot;%d: B\n&quot;</span>, score);
+        <span class="k">case</span> <span class="n">0</span>:          printf(<span class="s">&quot;%d: no score\n&quot;</span>, score);
+        <span class="k">default</span>:         printf(<span class="s">&quot;%d: C or below\n&quot;</span>, score);
+    }
+}
+
+<span class="t">void</span> main() {
+    grade(<span class="n">95</span>);
+    grade(<span class="n">83</span>);
+    grade(<span class="n">0</span>);
+    grade(<span class="n">42</span>);
+}</code></pre>
+<pre class="out"><code>95: A
+83: B
+0: no score
+42: C or below</code></pre>
+<p>Ranges work on characters too, since a character is a number:</p>
+<pre class="code run"><code><span class="t">u8</span> *kind(<span class="t">u8</span> c) {
+    <span class="k">switch</span> (c) {
+        <span class="k">case</span> <span class="s">&#x27;a&#x27;</span> ... <span class="s">&#x27;z&#x27;</span>: <span class="k">return</span> <span class="s">&quot;lower&quot;</span>;
+        <span class="k">case</span> <span class="s">&#x27;A&#x27;</span> ... <span class="s">&#x27;Z&#x27;</span>: <span class="k">return</span> <span class="s">&quot;upper&quot;</span>;
+        <span class="k">case</span> <span class="s">&#x27;0&#x27;</span> ... <span class="s">&#x27;9&#x27;</span>: <span class="k">return</span> <span class="s">&quot;digit&quot;</span>;
+        <span class="k">default</span>:          <span class="k">return</span> <span class="s">&quot;other&quot;</span>;
+    }
+}
+
+<span class="t">void</span> main() {
+    printf(<span class="s">&quot;%s %s %s %s\n&quot;</span>, kind(<span class="s">&#x27;q&#x27;</span>), kind(<span class="s">&#x27;Q&#x27;</span>), kind(<span class="s">&#x27;7&#x27;</span>), kind(<span class="s">&#x27;!&#x27;</span>));
+}</code></pre>
+<pre class="out"><code>lower upper digit other</code></pre>
+<p>Two cases may not cover the same value:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">void</span> main() {
+    <span class="t">i64</span> n = <span class="n">5</span>;
+    <span class="k">switch</span> (n) {
+        <span class="k">case</span> <span class="n">1</span> ... <span class="n">10</span>: printf(<span class="s">&quot;low\n&quot;</span>);
+        <span class="k">case</span> <span class="n">5</span>: printf(<span class="s">&quot;five\n&quot;</span>);
+    }
+}</code></pre>
+<pre class="out"><code>error:</code></pre>
+<h2 id="fallthrough"><a href="#fallthrough">fallthrough</a></h2>
+<p><code>fallthrough;</code> as the last statement of a case runs on into the next case.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">1</span>; i &lt;= <span class="n">3</span>; i++) {
+        printf(<span class="s">&quot;%d:&quot;</span>, i);
+        <span class="k">switch</span> (i) {
+            <span class="k">case</span> <span class="n">1</span>:
+                printf(<span class="s">&quot; one&quot;</span>);
+                <span class="k">fallthrough</span>;
+            <span class="k">case</span> <span class="n">2</span>:
+                printf(<span class="s">&quot; one-or-two&quot;</span>);
+            <span class="k">case</span> <span class="n">3</span>:
+                printf(<span class="s">&quot; three&quot;</span>);
+        }
+        printf(<span class="s">&quot;\n&quot;</span>);
+    }
+}</code></pre>
+<pre class="out"><code>1: one one-or-two
+2: one-or-two
+3: three</code></pre>
+<p><code>fallthrough</code> is an error anywhere else:</p>
+<ul><li>outside a switch, or before other statements of its case;</li><li>inside an <code>if</code> or a loop in the case;</li><li>in the last case, which has no next case.</li></ul>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">void</span> main() {
+    <span class="t">i64</span> n = <span class="n">1</span>;
+    <span class="k">switch</span> (n) {
+        <span class="k">case</span> <span class="n">1</span>:
+            <span class="k">fallthrough</span>;
+            printf(<span class="s">&quot;never\n&quot;</span>);
+        <span class="k">case</span> <span class="n">2</span>:
+            printf(<span class="s">&quot;two\n&quot;</span>);
+    }
+}</code></pre>
+<pre class="out"><code>error:</code></pre>
+<h2 id="each-case-is-a-block"><a href="#each-case-is-a-block">Each case is a block</a></h2>
+<p>A case can declare its own variables without braces, and two cases can use the same name.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">2</span>; i++) {
+        <span class="k">switch</span> (i) {
+            <span class="k">case</span> <span class="n">0</span>:
+                <span class="t">i64</span> n = <span class="n">10</span>;
+                printf(<span class="s">&quot;case 0: n = %d\n&quot;</span>, n);
+            <span class="k">case</span> <span class="n">1</span>:
+                <span class="t">i64</span> n = <span class="n">20</span>;
+                printf(<span class="s">&quot;case 1: n = %d\n&quot;</span>, n);
+        }
+    }
+}</code></pre>
+<pre class="out"><code>case 0: n = 10
+case 1: n = 20</code></pre>
+<p>A <code>defer</code> in a case runs at the end of that case. It needs braces: <code>case 1: { defer ...; }</code>.</p>
+<h2 id="switching-on-enums"><a href="#switching-on-enums">Switching on enums</a></h2>
+<p>The cases of an <a href="14-enums.html">enum</a> are its members.</p>
+<pre class="code run"><code><span class="k">enum</span> Color { red, green, blue };
+
+<span class="t">u8</span> *hex(Color c) {
+    <span class="k">switch</span> (c) {
+        <span class="k">case</span> Color.red:   <span class="k">return</span> <span class="s">&quot;#f00&quot;</span>;
+        <span class="k">case</span> Color.green: <span class="k">return</span> <span class="s">&quot;#0f0&quot;</span>;
+        <span class="k">case</span> Color.blue:  <span class="k">return</span> <span class="s">&quot;#00f&quot;</span>;
+    }
+    <span class="k">return</span> <span class="s">&quot;?&quot;</span>;
+}
+
+<span class="t">void</span> main() {
+    printf(<span class="s">&quot;%s %s %s\n&quot;</span>, hex(Color.red), hex(Color.green), hex(Color.blue));
+}</code></pre>
+<pre class="out"><code>#f00 #0f0 #00f</code></pre>
+<h2 id="switching-on-text"><a href="#switching-on-text">Switching on text</a></h2>
+<p>A <code>u8[]</code> or a <code>String</code> can be switched on, with string literals as the cases. A case matches when the value has exactly its bytes: the same length, the same case, no trimming.</p>
+<pre class="code run"><code><span class="t">i64</span> run(<span class="t">u8</span>[] cmd) {
+    <span class="k">switch</span> (cmd) {
+        <span class="k">case</span> <span class="s">&quot;GET&quot;</span>:    <span class="k">return</span> <span class="n">1</span>;
+        <span class="k">case</span> <span class="s">&quot;SET&quot;</span>:    <span class="k">return</span> <span class="n">2</span>;
+        <span class="k">case</span> <span class="s">&quot;DEL&quot;</span>:
+        <span class="k">case</span> <span class="s">&quot;REMOVE&quot;</span>: <span class="k">return</span> <span class="n">3</span>;
+        <span class="k">default</span>:       <span class="k">return</span> <span class="n">0</span>;
+    }
+}
+
+<span class="t">void</span> main() {
+    <span class="t">u8</span>[] line = <span class="s">&quot;SET name ktm&quot;</span>;
+    printf(<span class="s">&quot;%d %d %d %d\n&quot;</span>, run(<span class="s">&quot;GET&quot;</span>), run(line[<span class="n">0</span>:<span class="n">3</span>]), run(<span class="s">&quot;REMOVE&quot;</span>), run(<span class="s">&quot;get&quot;</span>));
+}</code></pre>
+<pre class="out"><code>1 2 3 0</code></pre>
+<ul><li>Every case is a string literal: no ranges and no integers.</li><li>The same string twice is an error.</li><li>The value is computed once, so <code>switch (readCommand())</code> calls the function once.</li><li><code>default</code>, stacked labels and <code>fallthrough</code> work as in a switch on numbers.</li></ul>
+<p>For a match that ignores case, switch on a lower-case copy:</p>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">i64</span> code(<span class="t">u8</span>[] word) {
+    <span class="t">String</span> low = str.from(word);
+    low.toLower();
+    <span class="t">i64</span> result = <span class="n">0</span>;
+    <span class="k">switch</span> (low) {
+        <span class="k">case</span> <span class="s">&quot;yes&quot;</span>: result = <span class="n">1</span>;
+        <span class="k">case</span> <span class="s">&quot;no&quot;</span>:  result = <span class="n">2</span>;
+    }
+    low.free();
+    <span class="k">return</span> result;
+}
+
+<span class="t">void</span> main() {
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, code(<span class="s">&quot;YES&quot;</span>), code(<span class="s">&quot;No&quot;</span>), code(<span class="s">&quot;maybe&quot;</span>));
+}</code></pre>
+<pre class="out"><code>1 2 0</code></pre>
+<h2 id="two-extras"><a href="#two-extras">Two extras</a></h2>
+<h3 id="implicit-case-values"><a href="#implicit-case-values">Implicit case values</a></h3>
+<p>A <code>case:</code> with no value is the previous case's value plus one, starting from 0.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">4</span>; i++) {
+        <span class="k">switch</span> (i) {
+            <span class="k">case</span>: printf(<span class="s">&quot;zero &quot;</span>);
+            <span class="k">case</span>: printf(<span class="s">&quot;one &quot;</span>);
+            <span class="k">case</span>: printf(<span class="s">&quot;two &quot;</span>);
+            <span class="k">default</span>: printf(<span class="s">&quot;more&quot;</span>);
+        }
+    }
+    printf(<span class="s">&quot;\n&quot;</span>);
+}</code></pre>
+<pre class="out"><code>zero one two more</code></pre>
+<h3 id="switch-x-no-range-check"><a href="#switch-x-no-range-check">switch [x]: no range check</a></h3>
+<p><code>switch [x]</code> leaves out the check that <code>x</code> is within the cases' range, for a jump table without the test. Use it only when <code>x</code> always matches a case: anything else is undefined. A switch on text always checks.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">3</span>; i++) {
+        <span class="k">switch</span> [i] {
+            <span class="k">case</span> <span class="n">0</span>: printf(<span class="s">&quot;a&quot;</span>);
+            <span class="k">case</span> <span class="n">1</span>: printf(<span class="s">&quot;b&quot;</span>);
+            <span class="k">case</span> <span class="n">2</span>: printf(<span class="s">&quot;c\n&quot;</span>);
+        }
+    }
+}</code></pre>
+<pre class="out"><code>abc</code></pre>
+    <nav class="pager"><a class="prev" href="05-control-flow.html"><span>Previous</span>Control flow</a><a class="next" href="07-functions.html"><span>Next</span>Functions</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#the-basics">The basics</a></li><li><a href="#break">break</a></li><li><a href="#several-values-one-body">Several values, one body</a></li><li><a href="#ranges">Ranges</a></li><li><a href="#fallthrough">fallthrough</a></li><li><a href="#each-case-is-a-block">Each case is a block</a></li><li><a href="#switching-on-enums">Switching on enums</a></li><li><a href="#switching-on-text">Switching on text</a></li><li><a href="#two-extras">Two extras</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Function pointers - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html" class="on"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li></ol></aside>
+  <article class="prose">
+<h1>Function pointers</h1>
+<p>A function pointer holds the address of a function, so the function to call can be chosen at run time, stored in a table or a struct, and passed to other functions. Its type is written <code>fn(parameter types) return type</code>. This chapter covers the type, taking addresses and calling through pointers, passing and returning functions, tables of them, pointers in structs, pointers to function pointers, callbacks with context, and which conversions work.</p>
+<h2 id="the-type-and-calling-through-it"><a href="#the-type-and-calling-through-it">The type and calling through it</a></h2>
+<p><code>fn(i64, i64) i64</code> is the type of a pointer to a function that takes two <code>i64</code>s and returns an <code>i64</code>. <code>&amp;name</code> is a function's address; calling the pointer calls the function:</p>
+<pre class="code run"><code><span class="t">i64</span> add(<span class="t">i64</span> a, <span class="t">i64</span> b) {
+    <span class="k">return</span> a + b;
+}
+
+<span class="t">i64</span> mul(<span class="t">i64</span> a, <span class="t">i64</span> b) {
+    <span class="k">return</span> a * b;
+}
+
+<span class="t">i32</span> main() {
+    fn(<span class="t">i64</span>, <span class="t">i64</span>) <span class="t">i64</span> op = &amp;add;
+    printf(<span class="s">&quot;%d\n&quot;</span>, op(<span class="n">2</span>, <span class="n">3</span>));
+    op = &amp;mul;
+    printf(<span class="s">&quot;%d\n&quot;</span>, op(<span class="n">2</span>, <span class="n">3</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>5
+6</code></pre>
+<ul><li>Parameter names are optional and ignored: <code>fn(i64 a, i64 b) i64</code> is <code>fn(i64, i64) i64</code>.</li><li><code>(*f)(x)</code> calls it too, as in C.</li><li>The arguments are checked against the pointer's parameter types, like a direct call.</li></ul>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">i64</span> twice(<span class="t">i64</span> x) {
+    <span class="k">return</span> x * <span class="n">2</span>;
+}
+
+<span class="t">i32</span> main() {
+    fn(<span class="t">i64</span>) <span class="t">i64</span> f = &amp;twice;
+    f(<span class="n">1</span>, <span class="n">2</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>Unexpected number of arguments 2 in call to f(), expected 1 args</code></pre>
+<p>A function returning nothing is <code>fn(...) void</code>, and one taking nothing is <code>fn() T</code>:</p>
+<pre class="code run"><code><span class="t">void</span> hello() {
+    printf(<span class="s">&quot;hello\n&quot;</span>);
+}
+
+<span class="t">i64</span> answer() {
+    <span class="k">return</span> <span class="n">42</span>;
+}
+
+<span class="t">i32</span> main() {
+    fn() <span class="t">void</span> h = &amp;hello;
+    fn() <span class="t">i64</span> a = &amp;answer;
+    h();
+    printf(<span class="s">&quot;%d\n&quot;</span>, a());
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>hello
+42</code></pre>
+<p>A function pointer that holds nothing is <code>null</code>; calling it crashes, so check first when it may be unset:</p>
+<pre class="code run"><code><span class="t">void</span> run(fn() <span class="t">void</span> hook) {
+    <span class="k">if</span> (hook != <span class="k">null</span>) {
+        hook();
+    } <span class="k">else</span> {
+        printf(<span class="s">&quot;no hook\n&quot;</span>);
+    }
+}
+
+<span class="t">void</span> hi() {
+    printf(<span class="s">&quot;hi\n&quot;</span>);
+}
+
+<span class="t">i32</span> main() {
+    run(&amp;hi);
+    run(<span class="k">null</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>hi
+no hook</code></pre>
+<h2 id="passing-a-function"><a href="#passing-a-function">Passing a function</a></h2>
+<p>A function that takes a function pointer runs code its caller chooses:</p>
+<pre class="code run"><code><span class="t">i64</span> add(<span class="t">i64</span> a, <span class="t">i64</span> b) {
+    <span class="k">return</span> a + b;
+}
+
+<span class="t">i64</span> mul(<span class="t">i64</span> a, <span class="t">i64</span> b) {
+    <span class="k">return</span> a * b;
+}
+
+<span class="t">i64</span> fold(fn(<span class="t">i64</span>, <span class="t">i64</span>) <span class="t">i64</span> op, <span class="t">i64</span>[] nums) {
+    <span class="t">i64</span> acc = nums[<span class="n">0</span>];
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">1</span>; i &lt; nums.len; i++) {
+        acc = op(acc, nums[i]);
+    }
+    <span class="k">return</span> acc;
+}
+
+<span class="t">i32</span> main() {
+    <span class="t">i64</span> nums[<span class="n">4</span>] = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>, <span class="n">4</span>};
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, fold(&amp;add, nums), fold(&amp;mul, nums));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>10 24</code></pre>
+<p>A predicate selects:</p>
+<pre class="code run"><code><span class="t">bool</span> isEven(<span class="t">i64</span> n) {
+    <span class="k">return</span> n % <span class="n">2</span> == <span class="n">0</span>;
+}
+
+<span class="t">bool</span> isBig(<span class="t">i64</span> n) {
+    <span class="k">return</span> n &gt; <span class="n">10</span>;
+}
+
+<span class="t">i64</span> count(<span class="t">i64</span>[] xs, fn(<span class="t">i64</span>) <span class="t">bool</span> keep) {
+    <span class="t">i64</span> n = <span class="n">0</span>;
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; xs.len; i++) {
+        <span class="k">if</span> (keep(xs[i])) {
+            n++;
+        }
+    }
+    <span class="k">return</span> n;
+}
+
+<span class="t">i32</span> main() {
+    <span class="t">i64</span> xs[<span class="n">6</span>] = {<span class="n">3</span>, <span class="n">12</span>, <span class="n">8</span>, <span class="n">21</span>, <span class="n">6</span>, <span class="n">15</span>};
+    printf(<span class="s">&quot;%d even, %d big\n&quot;</span>, count(xs, &amp;isEven), count(xs, &amp;isBig));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>3 even, 3 big</code></pre>
+<h2 id="tables-of-functions"><a href="#tables-of-functions">Tables of functions</a></h2>
+<p>An array of function pointers takes its size after the name, like any array:</p>
+<pre class="code run"><code><span class="t">i64</span> dbl(<span class="t">i64</span> x) {
+    <span class="k">return</span> x * <span class="n">2</span>;
+}
+
+<span class="t">i64</span> sq(<span class="t">i64</span> x) {
+    <span class="k">return</span> x * x;
+}
+
+<span class="t">i64</span> neg(<span class="t">i64</span> x) {
+    <span class="k">return</span> -x;
+}
+
+fn(<span class="t">i64</span>) <span class="t">i64</span> ops[<span class="n">3</span>] = {&amp;dbl, &amp;sq, &amp;neg};
+<span class="t">u8</span> *names[<span class="n">3</span>] = {<span class="s">&quot;double&quot;</span>, <span class="s">&quot;square&quot;</span>, <span class="s">&quot;negate&quot;</span>};
+
+<span class="t">i32</span> main() {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">3</span>; i++) {
+        printf(<span class="s">&quot;%s(5) = %d\n&quot;</span>, names[i], ops[i](<span class="n">5</span>));
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>double(5) = 10
+square(5) = 25
+negate(5) = -5</code></pre>
+<p>A table indexed by an enum makes a small dispatcher:</p>
+<pre class="code run"><code><span class="k">enum</span> Op { add, sub, mul };
+
+<span class="t">i64</span> doAdd(<span class="t">i64</span> a, <span class="t">i64</span> b) {
+    <span class="k">return</span> a + b;
+}
+
+<span class="t">i64</span> doSub(<span class="t">i64</span> a, <span class="t">i64</span> b) {
+    <span class="k">return</span> a - b;
+}
+
+<span class="t">i64</span> doMul(<span class="t">i64</span> a, <span class="t">i64</span> b) {
+    <span class="k">return</span> a * b;
+}
+
+fn(<span class="t">i64</span>, <span class="t">i64</span>) <span class="t">i64</span> handlers[<span class="n">3</span>] = {&amp;doAdd, &amp;doSub, &amp;doMul};
+
+<span class="t">i64</span> apply(Op op, <span class="t">i64</span> a, <span class="t">i64</span> b) {
+    <span class="k">return</span> handlers[op](a, b);
+}
+
+<span class="t">i32</span> main() {
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, apply(Op.add, <span class="n">7</span>, <span class="n">3</span>), apply(Op.sub, <span class="n">7</span>, <span class="n">3</span>), apply(Op.mul, <span class="n">7</span>, <span class="n">3</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>10 4 21</code></pre>
+<h2 id="in-a-struct"><a href="#in-a-struct">In a struct</a></h2>
+<p>A field can be a function pointer; it is called like a method, but the function is whatever the field holds (see <a href="13-methods.html">Methods</a> for run-time dispatch built this way):</p>
+<pre class="code run"><code><span class="t">i64</span> dbl(<span class="t">i64</span> x) {
+    <span class="k">return</span> x * <span class="n">2</span>;
+}
+
+<span class="k">struct</span> Calc {
+    <span class="t">u8</span> *name;
+    fn(<span class="t">i64</span>) <span class="t">i64</span> op;
+};
+
+<span class="t">i32</span> main() {
+    Calc c = {<span class="s">&quot;doubler&quot;</span>, &amp;dbl};
+    printf(<span class="s">&quot;%s: %d\n&quot;</span>, c.name, c.op(<span class="n">5</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>doubler: 10</code></pre>
+<p>A default in the pointer type's parameter list fills an argument the call leaves out:</p>
+<pre class="code run"><code><span class="t">i64</span> dbl(<span class="t">i64</span> x) {
+    <span class="k">return</span> x * <span class="n">2</span>;
+}
+
+<span class="k">struct</span> Calc {
+    fn(<span class="t">i64</span> x = <span class="n">21</span>) <span class="t">i64</span> op;
+};
+
+<span class="t">i32</span> main() {
+    Calc c = {&amp;dbl};
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, c.op(<span class="n">5</span>), c.op());
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>10 42</code></pre>
+<h2 id="returning-a-function"><a href="#returning-a-function">Returning a function</a></h2>
+<p>A function can return a function pointer. A <code>*</code> after a return type belongs to that type, so <code>fn(u8 *) u8 *</code> returns a <code>u8 *</code>:</p>
+<pre class="code run"><code><span class="t">i64</span> dbl(<span class="t">i64</span> x) {
+    <span class="k">return</span> x * <span class="n">2</span>;
+}
+
+<span class="t">i64</span> sq(<span class="t">i64</span> x) {
+    <span class="k">return</span> x * x;
+}
+
+fn(<span class="t">i64</span>) <span class="t">i64</span> choose(<span class="t">bool</span> square) {
+    <span class="k">if</span> (square) {
+        <span class="k">return</span> &amp;sq;
+    }
+    <span class="k">return</span> &amp;dbl;
+}
+
+<span class="t">i32</span> main() {
+    fn(<span class="t">i64</span>) <span class="t">i64</span> f = choose(<span class="k">true</span>);
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, f(<span class="n">5</span>), choose(<span class="k">false</span>)(<span class="n">5</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>25 10</code></pre>
+<h2 id="calling-any-expression"><a href="#calling-any-expression">Calling any expression</a></h2>
+<p>Anything whose type is a function pointer can be called: a cast, a call's result, an assignment:</p>
+<pre class="code run"><code><span class="k">import</span> cstr;
+
+<span class="t">i64</span> add(<span class="t">i64</span> a, <span class="t">i64</span> b) {
+    <span class="k">return</span> a + b;
+}
+
+<span class="t">i64</span> mul(<span class="t">i64</span> a, <span class="t">i64</span> b) {
+    <span class="k">return</span> a * b;
+}
+
+<span class="t">void</span> *lookup(<span class="t">u8</span> *name) {
+    <span class="k">if</span> (!cstr.cmp(name, <span class="s">&quot;add&quot;</span>)) {
+        <span class="k">return</span> &amp;add;
+    }
+    <span class="k">return</span> &amp;mul;
+}
+
+<span class="t">i32</span> main() {
+    fn(<span class="t">i64</span>, <span class="t">i64</span>) <span class="t">i64</span> f;
+    printf(<span class="s">&quot;%d\n&quot;</span>, ((fn(<span class="t">i64</span>, <span class="t">i64</span>) <span class="t">i64</span>)lookup(<span class="s">&quot;add&quot;</span>))(<span class="n">2</span>, <span class="n">3</span>));
+    printf(<span class="s">&quot;%d\n&quot;</span>, (f = &amp;mul)(<span class="n">4</span>, <span class="n">5</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>5
+20</code></pre>
+<h2 id="a-pointer-to-a-function-pointer"><a href="#a-pointer-to-a-function-pointer">A pointer to a function pointer</a></h2>
+<p>To point at a function-pointer variable, put the <code>fn</code> type in parentheses: <code>(fn(i64) i64) *</code>.</p>
+<pre class="code run"><code><span class="t">i64</span> dbl(<span class="t">i64</span> x) {
+    <span class="k">return</span> x * <span class="n">2</span>;
+}
+
+<span class="t">i64</span> sq(<span class="t">i64</span> x) {
+    <span class="k">return</span> x * x;
+}
+
+<span class="t">void</span> replace((fn(<span class="t">i64</span>) <span class="t">i64</span>) *slot, fn(<span class="t">i64</span>) <span class="t">i64</span> g) {
+    *slot = g;
+}
+
+<span class="t">i32</span> main() {
+    fn(<span class="t">i64</span>) <span class="t">i64</span> f = &amp;sq;
+    printf(<span class="s">&quot;%d &quot;</span>, f(<span class="n">5</span>));
+    replace(&amp;f, &amp;dbl);
+    printf(<span class="s">&quot;%d %s\n&quot;</span>, f(<span class="n">5</span>), <span class="k">typeof</span>(&amp;f));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>25 10 (fn(i64) i64) *</code></pre>
+<h2 id="defaults-and-variable-arguments"><a href="#defaults-and-variable-arguments">Defaults and variable arguments</a></h2>
+<p>A function pointer's parameters can have defaults and take extras in every form a function does (see <a href="19-varargs.html">Variable arguments</a>):</p>
+<pre class="code run"><code><span class="t">i64</span> add(<span class="t">i64</span> a, <span class="t">i64</span> b) {
+    <span class="k">return</span> a + b;
+}
+
+<span class="t">i64</span> count(...args) {
+    <span class="k">return</span> args.len;
+}
+
+<span class="t">i32</span> main() {
+    fn(<span class="t">i64</span> a, <span class="t">i64</span> b = <span class="n">10</span>) <span class="t">i64</span> k = &amp;add;
+    fn(...args) <span class="t">i64</span> c = &amp;count;
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, k(<span class="n">1</span>), k(<span class="n">1</span>, <span class="n">2</span>), c(<span class="n">4</span>, <span class="n">5</span>, <span class="n">6</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>11 3 3</code></pre>
+<h2 id="methods-and-overloads"><a href="#methods-and-overloads">Methods and overloads</a></h2>
+<p><code>&amp;Type.method</code> is a method as a function pointer whose first parameter is the struct pointer (see <a href="13-methods.html">Methods</a>):</p>
+<pre class="code run"><code><span class="k">struct</span> Light { <span class="t">bool</span> on; };
+
+<span class="t">void</span> Light.toggle() {
+    self.on = !self.on;
+}
+
+<span class="t">i32</span> main() {
+    Light l = {<span class="k">false</span>};
+    fn(Light *) <span class="t">void</span> f = &amp;Light.toggle;
+    f(&amp;l);
+    printf(<span class="s">&quot;%d\n&quot;</span>, l.on);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>1</code></pre>
+<p>For an overloaded function, <code>&amp;name</code> picks the overload the destination's type asks for (see <a href="18-overloading.html">Overloading</a>).</p>
+<h2 id="callbacks-with-context"><a href="#callbacks-with-context">Callbacks with context</a></h2>
+<p>ktm has no closures: a function pointer is only an address. A callback that needs data of its own gets it through an extra <code>void *</code> the caller passes along:</p>
+<pre class="code run"><code><span class="t">void</span> each(<span class="t">i64</span>[] xs, fn(<span class="t">i64</span>, <span class="t">void</span> *) <span class="t">void</span> f, <span class="t">void</span> *ctx) {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; xs.len; i++) {
+        f(xs[i], ctx);
+    }
+}
+
+<span class="k">struct</span> Stats {
+    <span class="t">i64</span> sum;
+    <span class="t">i64</span> count;
+};
+
+<span class="t">void</span> collect(<span class="t">i64</span> x, <span class="t">void</span> *ctx) {
+    Stats *s = ctx;
+    s.sum += x;
+    s.count++;
+}
+
+<span class="t">i32</span> main() {
+    <span class="t">i64</span> xs[<span class="n">4</span>] = {<span class="n">2</span>, <span class="n">4</span>, <span class="n">6</span>, <span class="n">8</span>};
+    Stats st = {<span class="n">0</span>, <span class="n">0</span>};
+    each(xs, &amp;collect, &amp;st);
+    printf(<span class="s">&quot;sum %d of %d\n&quot;</span>, st.sum, st.count);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>sum 20 of 4</code></pre>
+<h2 id="callbacks-with-real-types"><a href="#callbacks-with-real-types">Callbacks with real types</a></h2>
+<p>A <code>void *</code> parameter on one side matches any pointer parameter on the other. So a callback can take the types it really gets, and be passed where a <code>void *</code> one is expected, without a cast:</p>
+<pre class="code run"><code><span class="k">struct</span> Item { <span class="t">i64</span> key; };
+
+<span class="t">i64</span> itemLess(Item *a, Item *b) {
+    <span class="k">return</span> a.key &lt; b.key;
+}
+
+<span class="t">i32</span> main() {
+    Item a = {<span class="n">1</span>}, b = {<span class="n">2</span>};
+    fn(<span class="t">void</span> *, <span class="t">void</span> *) <span class="t">i64</span> cmp = &amp;itemLess;
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, cmp(&amp;a, &amp;b), cmp(&amp;b, &amp;a));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>1 0</code></pre>
+<p>The <code>ctx</code> callback above can take its real type the same way:</p>
+<pre class="code run"><code><span class="k">struct</span> Stats { <span class="t">i64</span> sum; };
+
+<span class="t">void</span> each(<span class="t">i64</span>[] xs, fn(<span class="t">i64</span>, <span class="t">void</span> *) <span class="t">void</span> f, <span class="t">void</span> *ctx) {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; xs.len; i++) {
+        f(xs[i], ctx);
+    }
+}
+
+<span class="t">void</span> add(<span class="t">i64</span> x, Stats *s) {
+    s.sum += x;
+}
+
+<span class="t">i32</span> main() {
+    <span class="t">i64</span> xs[<span class="n">3</span>] = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>};
+    Stats st = {<span class="n">0</span>};
+    each(xs, &amp;add, &amp;st);
+    printf(<span class="s">&quot;%d\n&quot;</span>, st.sum);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>6</code></pre>
+<p>A <code>void *</code> and <code>null</code> convert to and from a function pointer without a cast:</p>
+<pre class="code run"><code><span class="t">i64</span> dbl(<span class="t">i64</span> x) {
+    <span class="k">return</span> x * <span class="n">2</span>;
+}
+
+<span class="t">i32</span> main() {
+    <span class="t">void</span> *raw = &amp;dbl;
+    fn(<span class="t">i64</span>) <span class="t">i64</span> back = raw;
+    fn(<span class="t">i64</span>) <span class="t">i64</span> none = <span class="k">null</span>;
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, back(<span class="n">4</span>), raw == &amp;dbl, none == <span class="k">null</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>8 1 1</code></pre>
+<h2 id="what-doesn-t-convert"><a href="#what-doesn-t-convert">What doesn't convert</a></h2>
+<p>Any other mismatch is an error that names both types:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">i64</span> t(<span class="t">i64</span> x) {
+    <span class="k">return</span> x;
+}
+
+<span class="t">i32</span> main() {
+    fn(<span class="t">u8</span> *) <span class="t">i64</span> op = &amp;t;
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>cannot convert fn(i64) i64 to fn(u8*) i64</code></pre>
+<p>These need a cast:</p>
+<ul><li>a different return type;</li><li>different integer, struct, slice or function-pointer parameters;</li><li>a pointer to a function pointer: <code>(fn(Item *) i64) *</code> is not <code>(fn(void *) i64) *</code>.</li></ul>
+<p>C's declarator form, <code>i64 (*f)(i64)</code>, is an error that shows the <code>fn(...)</code> spelling to use:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">i64</span> dbl(<span class="t">i64</span> x) {
+    <span class="k">return</span> x * <span class="n">2</span>;
+}
+
+<span class="t">i32</span> main() {
+    <span class="t">i64</span> (*f)(<span class="t">i64</span>) = &amp;dbl;
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>a C function-pointer declarator: write `fn(i64) i64 f`</code></pre>
+<h2 id="rules"><a href="#rules">Rules</a></h2>
+<ul><li><code>fn(T1, T2) R</code> is a pointer to a function taking <code>T1, T2</code> and returning <code>R</code>; parameter names in it are optional.</li><li><code>&amp;name</code> is a function's address, <code>&amp;Type.method</code> a method's; calling the pointer calls the function, and the arguments are checked.</li><li>Function pointers can be variables, array elements, fields, parameters and return values; <code>(fn(...) R) *</code> points at one.</li><li>Defaults and extras work in the pointer type as in a function.</li><li><code>void *</code> parameters match any pointer parameter; <code>void *</code> and <code>null</code> convert to and from any function pointer. Everything else needs a cast.</li><li>There are no closures: pass a context pointer along with the function.</li><li><code>fn</code> is a keyword.</li></ul>
+    <nav class="pager"><a class="prev" href="19-varargs.html"><span>Previous</span>Variable arguments</a><a class="next" href="21-type-aliases.html"><span>Next</span>Type aliases</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#the-type-and-calling-through-it">The type and calling through it</a></li><li><a href="#passing-a-function">Passing a function</a></li><li><a href="#tables-of-functions">Tables of functions</a></li><li><a href="#in-a-struct">In a struct</a></li><li><a href="#returning-a-function">Returning a function</a></li><li><a href="#calling-any-expression">Calling any expression</a></li><li><a href="#a-pointer-to-a-function-pointer">A pointer to a function pointer</a></li><li><a href="#defaults-and-variable-arguments">Defaults and variable arguments</a></li><li><a href="#methods-and-overloads">Methods and overloads</a></li><li><a href="#callbacks-with-context">Callbacks with context</a></li><li><a href="#callbacks-with-real-types">Callbacks with real types</a></li><li><a href="#what-doesn-t-convert">What doesn&#x27;t convert</a></li><li><a href="#rules">Rules</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arrays and slices - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html" class="on">Language</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.23.1</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html" class="on"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-ad.html"><span class="num">16</span>defer and ad</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li></ol></aside>
+  <article class="prose">
+<h1>Arrays and slices</h1>
+<p>A fixed-size array holds its elements in place. A slice <code>T[]</code> is a pointer and a length: a view of some <code>T</code>s that knows how many there are, and checks every index. This chapter covers both, how they convert into each other, and when to use which.</p>
+<h2 id="arrays"><a href="#arrays">Arrays</a></h2>
+<p><code>T name[n]</code> is <code>n</code> values of type <code>T</code>, one after the other. Indexes start at 0.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> squares[<span class="n">5</span>];
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">5</span>; i++) {
+        squares[i] = i * i;
+    }
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">5</span>; i++) {
+        printf(<span class="s">&quot;%d &quot;</span>, squares[i]);
+    }
+    printf(<span class="s">&quot;\n%d bytes\n&quot;</span>, <span class="k">sizeof</span>(squares));
+}</code></pre>
+<pre class="out"><code>0 1 4 9 16 
+40 bytes</code></pre>
+<h3 id="initialiser-lists"><a href="#initialiser-lists">Initialiser lists</a></h3>
+<p>A list in braces gives the first values; the rest are zero. Without a size, the list sets it.</p>
+<pre class="code run"><code><span class="t">i64</span> gCounts[<span class="n">4</span>] = {<span class="n">1</span>, <span class="n">2</span>};
+
+<span class="t">void</span> main() {
+    <span class="t">i64</span> days[] = {<span class="n">31</span>, <span class="n">28</span>, <span class="n">31</span>};
+    <span class="t">f64</span> weights[<span class="n">3</span>] = {<span class="n">0.5</span>};
+    printf(<span class="s">&quot;%d %d %d %d\n&quot;</span>, gCounts[<span class="n">0</span>], gCounts[<span class="n">1</span>], gCounts[<span class="n">2</span>], gCounts[<span class="n">3</span>]);
+    printf(<span class="s">&quot;%d days in %d months\n&quot;</span>, days[<span class="n">0</span>] + days[<span class="n">1</span>] + days[<span class="n">2</span>], <span class="k">sizeof</span>(days) / <span class="k">sizeof</span>(<span class="t">i64</span>));
+    printf(<span class="s">&quot;%.1f %.1f %.1f\n&quot;</span>, weights[<span class="n">0</span>], weights[<span class="n">1</span>], weights[<span class="n">2</span>]);
+}</code></pre>
+<pre class="out"><code>1 2 0 0
+90 days in 3 months
+0.5 0.0 0.0</code></pre>
+<h3 id="arrays-of-arrays"><a href="#arrays-of-arrays">Arrays of arrays</a></h3>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> grid[<span class="n">2</span>][<span class="n">3</span>] = {{<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>}, {<span class="n">4</span>, <span class="n">5</span>, <span class="n">6</span>}};
+    <span class="k">for</span> (<span class="t">i64</span> r = <span class="n">0</span>; r &lt; <span class="n">2</span>; r++) {
+        <span class="k">for</span> (<span class="t">i64</span> c = <span class="n">0</span>; c &lt; <span class="n">3</span>; c++) {
+            printf(<span class="s">&quot;%d &quot;</span>, grid[r][c]);
+        }
+        printf(<span class="s">&quot;\n&quot;</span>);
+    }
+    <span class="t">i64</span> partial[<span class="n">2</span>][<span class="n">3</span>] = {{<span class="n">1</span>}, {<span class="n">4</span>, <span class="n">5</span>}};
+    printf(<span class="s">&quot;%d %d %d | %d %d %d\n&quot;</span>, partial[<span class="n">0</span>][<span class="n">0</span>], partial[<span class="n">0</span>][<span class="n">1</span>], partial[<span class="n">0</span>][<span class="n">2</span>],
+           partial[<span class="n">1</span>][<span class="n">0</span>], partial[<span class="n">1</span>][<span class="n">1</span>], partial[<span class="n">1</span>][<span class="n">2</span>]);
+}</code></pre>
+<pre class="out"><code>1 2 3 
+4 5 6 
+1 0 0 | 4 5 0</code></pre>
+<p>As in C, inner braces can be left out: the values fill the inner arrays (and structs) in order.</p>
+<pre class="code run"><code><span class="k">struct</span> Point { <span class="t">i64</span> x; <span class="t">i64</span> y; };
+
+Point gPoints[] = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>};      <span class="c">// (1, 2) and (3, 0)</span>
+
+<span class="t">void</span> main() {
+    <span class="t">i64</span> m[<span class="n">2</span>][<span class="n">2</span>] = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>};
+    printf(<span class="s">&quot;%d %d %d %d\n&quot;</span>, m[<span class="n">0</span>][<span class="n">0</span>], m[<span class="n">0</span>][<span class="n">1</span>], m[<span class="n">1</span>][<span class="n">0</span>], m[<span class="n">1</span>][<span class="n">1</span>]);
+    printf(<span class="s">&quot;%d points: (%d %d) (%d %d)\n&quot;</span>, <span class="k">sizeof</span>(gPoints) / <span class="k">sizeof</span>(Point),
+           gPoints[<span class="n">0</span>].x, gPoints[<span class="n">0</span>].y, gPoints[<span class="n">1</span>].x, gPoints[<span class="n">1</span>].y);
+}</code></pre>
+<pre class="out"><code>1 2 3 0
+2 points: (1 2) (3 0)</code></pre>
+<h3 id="what-arrays-can-t-do"><a href="#what-arrays-can-t-do">What arrays can't do</a></h3>
+<ul><li>An array can't be assigned as a whole: copy it with <code>mem.copy</code>, or use a slice.</li><li>Array indexes are not checked. An index out of range reads or writes memory that isn't the array's. Slice indexes are checked, which is one reason to pass arrays as slices.</li><li>An array's size is fixed when it is declared. For a list that grows, use <a href="../std/index.html#vec/vec.Vec">vec.Vec</a>.</li></ul>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">void</span> main() {
+    <span class="t">i64</span> a[<span class="n">3</span>] = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>};
+    <span class="t">i64</span> b[<span class="n">3</span>];
+    b = a;
+}</code></pre>
+<pre class="out"><code>error:</code></pre>
+<h2 id="slices"><a href="#slices">Slices</a></h2>
+<p>A slice <code>T[]</code> is two things: a pointer to the first element, and a length. It is a view: making one copies nothing.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> nums[<span class="n">6</span>] = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>, <span class="n">4</span>, <span class="n">5</span>, <span class="n">6</span>};
+    <span class="t">i64</span>[] all = nums;
+    <span class="t">i64</span>[] mid = all[<span class="n">1</span>:<span class="n">4</span>];
+    printf(<span class="s">&quot;%d %d | %d %d %d\n&quot;</span>, all.len, mid.len, mid[<span class="n">0</span>], mid[<span class="n">1</span>], mid[<span class="n">2</span>]);
+    printf(<span class="s">&quot;%s, %d bytes\n&quot;</span>, <span class="k">typeof</span>(mid), <span class="k">sizeof</span>(mid));
+}</code></pre>
+<pre class="out"><code>6 3 | 2 3 4
+i64[], 16 bytes</code></pre>
+<ul><li>An array converts to a slice of all its elements wherever a slice is expected.</li><li><code>s.len</code> is the length, <code>s.ptr</code> the pointer, <code>s[i]</code> an element.</li></ul>
+<h3 id="sub-slices"><a href="#sub-slices">Sub-slices</a></h3>
+<p><code>s[a:b]</code> is the elements from <code>a</code> up to, not including, <code>b</code>. Leave out <code>a</code> for the start and <code>b</code> for the end.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> nums[] = {<span class="n">10</span>, <span class="n">20</span>, <span class="n">30</span>, <span class="n">40</span>, <span class="n">50</span>};
+    <span class="t">i64</span>[] s = nums;
+    <span class="t">i64</span>[] head = s[:<span class="n">2</span>];
+    <span class="t">i64</span>[] tail = s[<span class="n">3</span>:];
+    <span class="t">i64</span>[] middle = s[<span class="n">1</span>:<span class="n">4</span>];
+    printf(<span class="s">&quot;%d %d | %d %d | %d %d %d\n&quot;</span>, head[<span class="n">0</span>], head[<span class="n">1</span>], tail[<span class="n">0</span>], tail[<span class="n">1</span>],
+           middle[<span class="n">0</span>], middle[<span class="n">1</span>], middle[<span class="n">2</span>]);
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, s[<span class="n">2</span>:<span class="n">2</span>].len, s[:].len);
+}</code></pre>
+<pre class="out"><code>10 20 | 40 50 | 20 30 40
+0 5</code></pre>
+<h3 id="a-view-writes-into-what-it-views"><a href="#a-view-writes-into-what-it-views">A view writes into what it views</a></h3>
+<p>A slice doesn't own its elements: writing through it writes the array (or whatever it views).</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> nums[<span class="n">4</span>] = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>, <span class="n">4</span>};
+    <span class="t">i64</span>[] tail = nums[<span class="n">2</span>:];
+    tail[<span class="n">0</span>] = <span class="n">30</span>;
+    printf(<span class="s">&quot;%d %d %d %d\n&quot;</span>, nums[<span class="n">0</span>], nums[<span class="n">1</span>], nums[<span class="n">2</span>], nums[<span class="n">3</span>]);
+}</code></pre>
+<pre class="out"><code>1 2 30 4</code></pre>
+<h3 id="a-slice-from-a-list"><a href="#a-slice-from-a-list">A slice from a list</a></h3>
+<p><code>T[] s = {...}</code> keeps the values in a hidden array that the slice views, for as long as the function runs (for a global, the whole program).</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span>[] xs = {<span class="n">4</span>, <span class="n">8</span>, <span class="n">15</span>};
+    <span class="t">u8</span>[][] words = {<span class="s">&quot;red&quot;</span>, <span class="s">&quot;green&quot;</span>, <span class="s">&quot;blue&quot;</span>};
+    printf(<span class="s">&quot;%d %d %s %d\n&quot;</span>, xs.len, xs[<span class="n">2</span>], words[<span class="n">1</span>], words.len);
+}</code></pre>
+<pre class="out"><code>3 15 green 3</code></pre>
+<h2 id="passing-arrays-as-slices"><a href="#passing-arrays-as-slices">Passing arrays as slices</a></h2>
+<p>A function that takes a slice accepts an array, a slice, or part of either. It always knows the length, so it doesn't need a separate count.</p>
+<pre class="code run"><code><span class="t">i64</span> sum(<span class="t">i64</span>[] xs) {
+    <span class="t">i64</span> total = <span class="n">0</span>;
+    <span class="k">for</span> (<span class="k">auto</span> x : xs) {
+        total += x;
+    }
+    <span class="k">return</span> total;
+}
+
+<span class="t">i64</span> maxOf(<span class="t">i64</span>[] xs) {
+    <span class="t">i64</span> best = xs[<span class="n">0</span>];
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">1</span>; i &lt; xs.len; i++) {
+        <span class="k">if</span> (xs[i] &gt; best) { best = xs[i]; }
+    }
+    <span class="k">return</span> best;
+}
+
+<span class="t">void</span> main() {
+    <span class="t">i64</span> nums[<span class="n">6</span>] = {<span class="n">4</span>, <span class="n">8</span>, <span class="n">15</span>, <span class="n">16</span>, <span class="n">23</span>, <span class="n">42</span>};
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, sum(nums), sum(nums[:<span class="n">3</span>]), maxOf(nums[<span class="n">1</span>:<span class="n">4</span>]));
+}</code></pre>
+<pre class="out"><code>108 27 16</code></pre>
+<p>A function can change the elements of a slice it is given:</p>
+<pre class="code run"><code><span class="t">void</span> doubleAll(<span class="t">i64</span>[] xs) {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; xs.len; i++) {
+        xs[i] *= <span class="n">2</span>;
+    }
+}
+
+<span class="t">void</span> main() {
+    <span class="t">i64</span> nums[] = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>, <span class="n">4</span>};
+    doubleAll(nums[<span class="n">1</span>:<span class="n">3</span>]);
+    printf(<span class="s">&quot;%d %d %d %d\n&quot;</span>, nums[<span class="n">0</span>], nums[<span class="n">1</span>], nums[<span class="n">2</span>], nums[<span class="n">3</span>]);
+}</code></pre>
+<pre class="out"><code>1 4 6 4</code></pre>
+<h2 id="every-index-is-checked"><a href="#every-index-is-checked">Every index is checked</a></h2>
+<p>Indexing a slice, and taking a sub-slice, is checked against the length, compiled and in the JIT. Out of range throws <code>ERR_BOUNDS</code>, an <a href="15-errors.html">error</a> you can catch; uncaught, it stops the program and says where.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">i64</span> nums[<span class="n">3</span>] = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>};
+    <span class="t">i64</span>[] s = nums;
+    <span class="k">try</span> {
+        printf(<span class="s">&quot;%d\n&quot;</span>, s[<span class="n">3</span>]);
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        printf(<span class="s">&quot;caught: %s\n&quot;</span>, e.message);
+    }
+    <span class="k">try</span> {
+        <span class="t">i64</span>[] t = s[<span class="n">2</span>:<span class="n">5</span>];
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        printf(<span class="s">&quot;caught: %s\n&quot;</span>, e.message);
+    }
+}</code></pre>
+<pre class="out"><code>caught: index 3 out of range for length 3
+caught: slice 2:5 out of range for length 3</code></pre>
+<ul><li>A check costs one comparison and a branch.</li><li>The compiler leaves it out where it can't fail: <code>s[i]</code> in <code>for (i64 i = 0; i &lt; s.len; i++)</code> when the body changes neither <code>i</code> nor <code>s</code>.</li><li><code>s.ptr[i]</code> is the unchecked way, for code that has checked its range itself.</li></ul>
+<h2 id="slices-and-pointers"><a href="#slices-and-pointers">Slices and pointers</a></h2>
+<p><code>p[0:n]</code> turns a raw pointer into a slice of <code>n</code> elements. It can't be checked: you vouch for <code>n</code>. The other way, <code>s.ptr</code> is the pointer.</p>
+<pre class="code run"><code><span class="k">import</span> mem;
+
+<span class="t">void</span> main() {
+    <span class="t">i64</span> *raw = mem.allocZero(<span class="n">4</span> * <span class="k">sizeof</span>(<span class="t">i64</span>));
+    <span class="t">i64</span>[] s = raw[<span class="n">0</span>:<span class="n">4</span>];
+    s[<span class="n">3</span>] = <span class="n">9</span>;
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, s.len, raw[<span class="n">3</span>], s.ptr == raw);
+    mem.free(raw);
+}</code></pre>
+<pre class="out"><code>4 9 1</code></pre>
+<h2 id="text-is-a-u8"><a href="#text-is-a-u8">Text is a u8[]</a></h2>
+<p>A string literal converts to a <code>u8[]</code> of its bytes, without the NUL at the end. So does a <code>String</code>. Most functions that read text take a <code>u8[]</code>.</p>
+<pre class="code run"><code><span class="t">void</span> main() {
+    <span class="t">u8</span>[] word = <span class="s">&quot;hello&quot;</span>;
+    printf(<span class="s">&quot;%s %d %c %s\n&quot;</span>, word, word.len, word[<span class="n">1</span>], word[<span class="n">1</span>:<span class="n">4</span>]);
+}</code></pre>
+<pre class="out"><code>hello 5 e ell</code></pre>
+<p>A <code>u8</code> buffer is all of its bytes: a <code>u8 buf[64]</code> passed as a <code>u8[]</code> has length 64, not the length of the text in it. <code>cstr.view(buf)</code> is the text up to its NUL.</p>
+<pre class="code run"><code><span class="k">import</span> cstr;
+
+<span class="t">void</span> main() {
+    <span class="t">u8</span> buf[<span class="n">64</span>];
+    cstr.copy(buf, <span class="s">&quot;hi&quot;</span>);
+    <span class="t">u8</span>[] whole = buf;
+    printf(<span class="s">&quot;%d %d %d\n&quot;</span>, whole.len, cstr.view(buf).len, buf[<span class="n">0</span>:<span class="n">2</span>].len);
+}</code></pre>
+<pre class="out"><code>64 2 2</code></pre>
+<p><a href="11-strings.html">Strings</a> covers text in depth.</p>
+<h2 id="comparing-and-freeing-slices"><a href="#comparing-and-freeing-slices">Comparing and freeing slices</a></h2>
+<ul><li><code>a == b</code> on slices is an error. Compare text with <code>a.equals(b)</code>, and identity with <code>a.ptr == b.ptr</code>.</li><li>A slice a function allocated for you, like the parts <code>str.split</code> returns, is yours: free it with <code>s.free()</code>.</li><li>A slice of an array, or of memory someone else owns, isn't yours to free.</li><li><code>s.len</code> and <code>s.ptr</code> are read-only: to change them, assign a whole new slice.</li></ul>
+<pre class="code run"><code><span class="k">import</span> str;
+
+<span class="t">void</span> main() {
+    <span class="t">u8</span>[] a = <span class="s">&quot;abc&quot;</span>;
+    <span class="t">u8</span> buf[<span class="n">3</span>] = {<span class="s">&#x27;a&#x27;</span>, <span class="s">&#x27;b&#x27;</span>, <span class="s">&#x27;c&#x27;</span>};
+    <span class="t">u8</span>[] b = buf;
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, a.equals(b), a.ptr == b.ptr);
+    <span class="t">u8</span>[][] parts = str.split(<span class="s">&quot;x,y,z&quot;</span>, <span class="s">&quot;,&quot;</span>);
+    printf(<span class="s">&quot;%d parts, the last is %s\n&quot;</span>, parts.len, parts[<span class="n">2</span>]);
+    parts.free();
+}</code></pre>
+<pre class="out"><code>1 0
+3 parts, the last is z</code></pre>
+<h2 id="slices-of-anything"><a href="#slices-of-anything">Slices of anything</a></h2>
+<p>Slices of structs, slices as fields, and slices of slices all work.</p>
+<pre class="code run"><code><span class="k">struct</span> User { <span class="t">u8</span>[] name; <span class="t">i64</span>[] scores; };
+
+<span class="t">i64</span> total(<span class="t">i64</span>[] xs) {
+    <span class="t">i64</span> t = <span class="n">0</span>;
+    <span class="k">for</span> (<span class="k">auto</span> x : xs) { t += x; }
+    <span class="k">return</span> t;
+}
+
+<span class="t">void</span> main() {
+    <span class="t">i64</span> a[] = {<span class="n">3</span>, <span class="n">4</span>};
+    <span class="t">i64</span> b[] = {<span class="n">10</span>};
+    User users[<span class="n">2</span>] = {{<span class="s">&quot;ann&quot;</span>, a}, {<span class="s">&quot;bob&quot;</span>, b}};
+    User[] all = users;
+    <span class="k">for</span> (<span class="k">auto</span> u : all) {
+        printf(<span class="s">&quot;%s: %d\n&quot;</span>, u.name, total(u.scores));
+    }
+}</code></pre>
+<pre class="out"><code>ann: 7
+bob: 10</code></pre>
+<h2 id="arrays-or-slices"><a href="#arrays-or-slices">Arrays or slices?</a></h2>
+<ul><li>Use an <strong>array</strong> for a fixed number of values that live in one place: a buffer, a small table.</li><li>Use a <strong>slice</strong> for parameters and for parts of something: it carries its length and every index is checked.</li><li>Use a <a href="../std/index.html#vec/vec.Vec">vec.Vec</a> for a list that grows. <code>items.data[0:items.len]</code> is a slice of its elements, and a range-based <code>for</code> walks it.</li></ul>
+    <nav class="pager"><a class="prev" href="09-memory.html"><span>Previous</span>Memory</a><a class="next" href="11-strings.html"><span>Next</span>Strings</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#arrays">Arrays</a></li><li><a href="#slices">Slices</a></li><li><a href="#passing-arrays-as-slices">Passing arrays as slices</a></li><li><a href="#every-index-is-checked">Every index is checked</a></li><li><a href="#slices-and-pointers">Slices and pointers</a></li><li><a href="#text-is-a-u8">Text is a u8[]</a></li><li><a href="#comparing-and-freeing-slices">Comparing and freeing slices</a></li><li><a href="#slices-of-anything">Slices of anything</a></li><li><a href="#arrays-or-slices">Arrays or slices?</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.23.1</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>
