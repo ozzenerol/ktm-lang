@@ -2,14 +2,14 @@
 <h1>HTTP programming</h1>
 <p class="lede">One project, from a ten-line server to an API you could run in production: <strong>Shelf</strong>, a
 bookmarks service. People save links, tag them, search them and share collections. Each chapter adds one thing and
-ends with a program that runs.</p>
+ends with a program that runs; its last section has the whole program as it stands, to check yours against.</p>
 
 <h2>What you build</h2>
 <table>
   <tr><th>Request</th><th>What it does</th></tr>
   <tr><td><code>POST /bookmarks</code></td><td>Save a link</td></tr>
   <tr><td><code>GET /bookmarks</code></td><td>Your links, newest first, a page at a time; <code>?tag=</code>, <code>?q=</code> to filter and search</td></tr>
-  <tr><td><code>GET /bookmarks/{id}</code>, <code>PATCH</code>, <code>DELETE</code></td><td>One link</td></tr>
+  <tr><td><code>GET /bookmarks/{id}</code>, <code>DELETE</code></td><td>One link</td></tr>
   <tr><td><code>POST /users</code>, <code>POST /sessions</code></td><td>Sign up, log in</td></tr>
   <tr><td><code>GET /collections/{id}</code></td><td>A shared collection, readable by anyone with the link</td></tr>
 </table>

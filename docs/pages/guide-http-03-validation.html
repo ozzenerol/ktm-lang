@@ -4,12 +4,12 @@
 request's fields fix the first two, and a check in the handler the third.</p>
 
 <h2>Rules on fields</h2>
-<p>Only <code>NewBookmark</code> and one line of <code>create</code> change:</p>
+<p>Only <code>NewBookmark</code> and <code>create</code> change. The struct gets rules, and <code>create</code>
+(below) reads the body with <code>http.decodeValid</code> instead of <code>http.decode</code>:</p>
 <pre><code>@json struct NewBookmark {
     @required @url @max(2048) u8[] url;
     @max(200) u8[] title;
 };</code></pre>
-<pre><code>    NewBookmark in = http.decodeValid<NewBookmark>(r);    /* a 422 by itself when a rule fails */</code></pre>
 <p><code>http.decodeValid</code> decodes as <code>http.decode</code> does, then checks the rules. When one fails, the
 handler stops there and the client gets a 422 that names each field and what is wrong with it:</p>
 <pre><code>$ curl -X POST localhost:8080/bookmarks -d '{"url": "not a link", "title": "x"}'
@@ -61,4 +61,97 @@ client handles them in one place:</p>
 </table>
 <p>The last row is worth knowing: a handler that throws doesn't take the server down. The request gets a 500, the log
 gets the error and the line it came from, and the next request is served as usual.</p>
+<h2>The whole program</h2>
+<p>The program at the end of this chapter, to check yours against:</p>
+<details class="code"><summary>main.ktm</summary>
+<pre><code>import date, json, net.http, reflect, str, uuid, vec;
+
+/* A saved link */
+@json struct Bookmark {
+    String id;
+    String url;
+    String title;
+    String createdAt;
+};
+
+/* What a client sends to save one */
+@json struct NewBookmark {
+    @required @url @max(2048) u8[] url;
+    @max(200) u8[] title;
+};
+
+/* Every bookmark, in memory for now (chapter 5 moves them to PostgreSQL) */
+vec.Vec<Bookmark> gBookmarks;
+
+/* The index of the bookmark with this id, or -1 */
+i64 find(u8[] id)
+{
+    for (i64 i = 0; i < gBookmarks.len; i++) {
+        if (str.equals(gBookmarks.data[i].id[0:], id)) { return i; }
+    }
+    return -1;
+}
+
+void list(http.Writer *w, http.Request *r)
+{
+    w.json(200, reflect.of(gBookmarks));
+}
+
+void get(http.Writer *w, http.Request *r)
+{
+    i64 i = find(r.param("id"));
+    if (i < 0) {
+        w.error(404, "no such bookmark");
+        return;
+    }
+    w.json(200, reflect.of(gBookmarks.data[i]));
+}
+
+void create(http.Writer *w, http.Request *r)
+{
+    NewBookmark in = http.decodeValid<NewBookmark>(r);    /* a 422 by itself when a rule fails */
+    for (i64 i = 0; i < gBookmarks.len; i++) {
+        if (str.equals(gBookmarks.data[i].url[0:], in.url)) {
+            w.error(409, "that link is already on the shelf");
+            return;
+        }
+    }
+    Bookmark b;
+    b.id = uuid.v7().string();
+    b.url = str.from(in.url);
+    b.title = str.from(in.title.len ? in.title : in.url);   /* no title yet: the link itself */
+    b.createdAt = date.formatUnix(date.unixNow(), "%Y-%m-%dT%H:%M:%SZ");
+    gBookmarks.push(b);
+    w.json(201, reflect.of(b));
+}
+
+void remove(http.Writer *w, http.Request *r)
+{
+    i64 i = find(r.param("id"));
+    if (i < 0) {
+        w.error(404, "no such bookmark");
+        return;
+    }
+    Bookmark b = gBookmarks.removeAt(i);
+    b.id.free();
+    b.url.free();
+    b.title.free();
+    b.createdAt.free();
+    w.status(204);
+}
+
+i32 main()
+{
+    http.Mux mux;
+    mux.handle("GET /bookmarks", &list);
+    mux.handle("POST /bookmarks", &create);
+    mux.handle("GET /bookmarks/{id}", &get);
+    mux.handle("DELETE /bookmarks/{id}", &remove);
+
+    http.Options o;
+    o.threads = 1;      /* one loop: the list in memory isn't shared between threads */
+    printf("Shelf listening on http://localhost:8080\n");
+    return http.listen(8080, &mux, null, &o);
+}</code></pre>
+</details>
 <p>Next: <a href="guide-http-04-config.html">Configuration</a>.</p>

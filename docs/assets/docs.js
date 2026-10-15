@@ -121,12 +121,20 @@
     });
   }
 
-  /* ---- sidebar as a menu on narrow screens ---- */
+  /* ---- sidebar: folds away on wide screens, a menu on narrow ones ---- */
   function setupMenu() {
     var menu = document.querySelector(".menu");
     var side = document.getElementById("sidebar");
     var scrim = document.querySelector(".scrim");
     if (!menu || !side) return;
+    var narrow = window.matchMedia("(max-width: 52rem)");
+    var root = document.documentElement;
+    function fold(closed) {
+      root.classList.toggle("side-closed", closed);
+      menu.setAttribute("aria-expanded", closed ? "false" : "true");
+      try { localStorage.setItem("ktm-side", closed ? "closed" : "open"); } catch (e) {}
+    }
+    if (!narrow.matches) menu.setAttribute("aria-expanded", root.classList.contains("side-closed") ? "false" : "true");
     function set(open) {
       side.classList.toggle("open", open);
       menu.setAttribute("aria-expanded", open ? "true" : "false");
@@ -136,10 +144,13 @@
         if (first) first.focus();
       }
     }
-    menu.addEventListener("click", function () { set(!side.classList.contains("open")); });
+    menu.addEventListener("click", function () {
+      if (narrow.matches) set(!side.classList.contains("open"));
+      else fold(!root.classList.contains("side-closed"));
+    });
     if (scrim) scrim.addEventListener("click", function () { set(false); });
     side.addEventListener("click", function (e) {
-      if (e.target.closest("a")) set(false);
+      if (narrow.matches && e.target.closest("a")) set(false);
     });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && side.classList.contains("open")) { set(false); menu.focus(); }

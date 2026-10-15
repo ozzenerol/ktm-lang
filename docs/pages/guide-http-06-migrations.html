@@ -23,7 +23,53 @@ ktm-pg's comes with it as <code>"github.com/ozzenerol/ktm-migrate/postgres"</cod
   <li>Never edit a migration that has run somewhere: add a new one.</li>
 </ul>
 
+<h2>Notes, in the code</h2>
+<p>The new column goes in <code>Bookmark</code>, in <code>NewBookmark</code> (at most 2000 bytes), in
+<code>COLUMNS</code> and in the <code>INSERT</code>: a migration and the code that uses it go in one commit.</p>
+<pre><code>@json struct Bookmark {
+    String id;
+    String url;
+    String title;
+    String notes;
+    String createdAt;
+};
+
+@json struct NewBookmark {
+    @required @url @max(2048) u8[] url;
+    @max(200) u8[] title;
+    @max(2000) u8[] notes;
+};
+
+/* The columns of a Bookmark, named as its fields */
+#define COLUMNS "id, url, title, notes, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS \"createdAt\""</code></pre>
+<p>In <code>create</code>, the <code>INSERT</code> takes the notes as a fourth parameter:</p>
+<pre><code>void create(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    NewBookmark in = http.decodeValid<NewBookmark>(r);
+    String id = uuid.v7().string();
+    defer id.free();
+    Bookmark b;
+    try {
+        b = pg.queryOne<Bookmark>(db, "INSERT INTO bookmarks (id, url, title, notes) VALUES ($1, $2, $3, $4) RETURNING " COLUMNS,
+                                  id, in.url, in.title.len ? in.title : in.url, in.notes);
+    } catch (Error e) {
+        if (e.code != pg.UNIQUE_VIOLATION) { throw(e); }
+        w.error(409, "that link is already on the shelf");
+        return;
+    }
+    defer b.freeDecoded();
+    w.json(201, reflect.of(b));
+}</code></pre>
+
 <h2>main</h2>
+<p>The two packages are imported by their paths; their names in the code are <code>migrate</code> and
+<code>postgres</code>. <code>fs</code> isn't needed any more (nothing reads <code>schema.sql</code>), and
+<code>str</code> is, for <code>runMigrate</code> below:</p>
+<pre><code>import "github.com/ozzenerol/ktm-pg";
+import "github.com/ozzenerol/ktm-migrate";
+import "github.com/ozzenerol/ktm-migrate/postgres";
+import config, flag, json, log, net.http, os, reflect, str, uuid, vec;</code></pre>
 <pre><code>i32 main(i32 argc, u8 **argv)
 {
     gSettings.port = 8080;
@@ -106,6 +152,163 @@ $ ./shelf
 
 $ curl -X POST localhost:8080/bookmarks -d '{"url": "https://ktm-lang.org", "title": "ktm", "notes": "read the guide"}'
 {"id":"01a13b0b-acf0-7000-b963-567833f2b799","url":"https://ktm-lang.org","title":"ktm","notes":"read the guide","createdAt":"2026-10-14T15:33:03Z"}</code></pre>
-<p>The new field is in <code>Bookmark</code>, <code>NewBookmark</code> (with <code>@max(2000)</code>), the
-<code>COLUMNS</code> list and the <code>INSERT</code>: a migration and the code that uses it go in one commit.</p>
+<h2>The whole program</h2>
+<p>The program at the end of this chapter, to check yours against:</p>
+<details class="code"><summary>main.ktm</summary>
+<pre><code>import "github.com/ozzenerol/ktm-pg";
+import "github.com/ozzenerol/ktm-migrate";
+import "github.com/ozzenerol/ktm-migrate/postgres";
+import config, flag, json, log, net.http, os, reflect, str, uuid, vec;
+
+@json struct Bookmark {
+    String id;
+    String url;
+    String title;
+    String notes;
+    String createdAt;
+};
+
+@json struct NewBookmark {
+    @required @url @max(2048) u8[] url;
+    @max(200) u8[] title;
+    @max(2000) u8[] notes;
+};
+
+/* The columns of a Bookmark, named as its fields */
+#define COLUMNS "id, url, title, notes, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS \"createdAt\""
+
+void list(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    vec.Vec<Bookmark> all = pg.queryAll<Bookmark>(db, "SELECT " COLUMNS " FROM bookmarks ORDER BY id DESC");
+    defer pg.free(reflect.of(all));
+    w.json(200, reflect.of(all));
+}
+
+/* The id in the path, or false (and a 404) when it isn't a UUID */
+bool pathId(http.Writer *w, http.Request *r, uuid.UUID *id)
+{
+    if (uuid.parse(r.param("id"), id)) { return true; }
+    w.error(404, "no such bookmark");
+    return false;
+}
+
+void get(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID id;
+    if (!pathId(w, r, &id)) { return; }
+    Bookmark b;
+    try {
+        b = pg.queryOne<Bookmark>(db, "SELECT " COLUMNS " FROM bookmarks WHERE id = $1", r.param("id"));
+    } catch (Error e) {
+        if (e.code != pg.ERR_NO_ROWS) { throw(e); }
+        w.error(404, "no such bookmark");
+        return;
+    }
+    defer b.freeDecoded();
+    w.json(200, reflect.of(b));
+}
+
+void create(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    NewBookmark in = http.decodeValid<NewBookmark>(r);
+    String id = uuid.v7().string();
+    defer id.free();
+    Bookmark b;
+    try {
+        b = pg.queryOne<Bookmark>(db, "INSERT INTO bookmarks (id, url, title, notes) VALUES ($1, $2, $3, $4) RETURNING " COLUMNS,
+                                  id, in.url, in.title.len ? in.title : in.url, in.notes);
+    } catch (Error e) {
+        if (e.code != pg.UNIQUE_VIOLATION) { throw(e); }
+        w.error(409, "that link is already on the shelf");
+        return;
+    }
+    defer b.freeDecoded();
+    w.json(201, reflect.of(b));
+}
+
+void remove(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID id;
+    if (!pathId(w, r, &id)) { return; }
+    if (db.exec("DELETE FROM bookmarks WHERE id = $1", r.param("id")) == 0) {
+        w.error(404, "no such bookmark");
+        return;
+    }
+    w.status(204);
+}
+
+/* shelf migrate up | down | status */
+i32 runMigrate(migrate.Migrations *ms, migrate.Driver *d, u8[] what)
+{
+    if (str.equals(what, "up")) {
+        printf("%d migrations ran\n", ms.up(d));
+    } else if (str.equals(what, "down")) {
+        printf("%d migration reverted\n", ms.down(d, 1));
+    } else if (str.equals(what, "status")) {
+        vec.Vec<migrate.Status> all = ms.status(d);
+        for (auto s : all) {
+            printf("%4d  %-22s %s\n", s.version, s.name, s.applied ? "applied" : "pending");
+        }
+        all.free();
+    } else {
+        log.error("shelf migrate: up, down or status, not `%s`", what);
+        return 2;
+    }
+    return 0;
+}
+
+struct Settings {
+    i64 port;
+    bool accessLog;
+    @required u8[] databaseUrl;
+};
+
+Settings gSettings;
+
+i32 main(i32 argc, u8 **argv)
+{
+    gSettings.port = 8080;
+    config.loadDotenv(".env");
+    try {
+        config.fromEnv(reflect.of(gSettings), "SHELF_");
+    } catch (Error e) {
+        log.error("%s", e.message);     /* every bad or missing variable, by name */
+        os.exit(2);
+    }
+
+    flag.Set *flags = flag.new("shelf", "a bookmarks API");
+    defer flags.free();
+    i64 *port = flags.integer("port", gSettings.port, "the port to listen on", 'p');
+    bool *accessLog = flags.boolean("access-log", gSettings.accessLog, "log every request");
+    flag.Set *migrateCmd = flags.command("migrate", "up, down or status, then exit");
+    flags.parseOrExit(argc, argv);
+
+    /* the database: a pool of connections shared by every thread */
+    pg.Pool *db = pg.open(gSettings.databaseUrl);
+    defer db.close();
+    migrate.Migrations ms = migrate.load("migrations");
+    defer ms.free();
+    migrate.Driver d = postgres.driverPool(db);
+    if (flags.chosen() == migrateCmd) {
+        return runMigrate(&ms, &d, migrateCmd.arg(0));
+    }
+    i64 ran = ms.up(&d);
+    log.info("database at version %d (%d migrations ran)", migrate.version(&d), ran);
+
+    http.Mux mux;
+    mux.handle("GET /bookmarks", &list);
+    mux.handle("POST /bookmarks", &create);
+    mux.handle("GET /bookmarks/{id}", &get);
+    mux.handle("DELETE /bookmarks/{id}", &remove);
+
+    http.Options o;
+    o.accessLog = *accessLog;
+    log.info("Shelf listening on http://localhost:%d", *port);
+    return http.listen((i32)*port, &mux, db, &o);
+}</code></pre>
+</details>
 <p>Next: <a href="guide-http-07-search.html">Tags, search and pages</a>.</p>

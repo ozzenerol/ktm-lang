@@ -4,6 +4,7 @@
 comes a page at a time. All three are SQL; the handlers stay small.</p>
 
 <h2>The migration</h2>
+<p><code>migrations/003_tags_and_search.up.sql</code>:</p>
 <pre><code>CREATE TABLE tags (
     bookmark_id uuid NOT NULL REFERENCES bookmarks (id) ON DELETE CASCADE,
     tag         text NOT NULL,
@@ -14,6 +15,10 @@ CREATE INDEX tags_tag ON tags (tag);
 ALTER TABLE bookmarks ADD search tsvector
     GENERATED ALWAYS AS (to_tsvector('simple', title || ' ' || notes || ' ' || url)) STORED;
 CREATE INDEX bookmarks_search ON bookmarks USING gin (search);</code></pre>
+<p><code>migrations/003_tags_and_search.down.sql</code> undoes it, newest first:</p>
+<pre><code>DROP INDEX bookmarks_search;
+ALTER TABLE bookmarks DROP search;
+DROP TABLE tags;</code></pre>
 <ul class="rules">
   <li>Tags are a table of their own, one row per bookmark and tag, deleted with their bookmark (<code>ON DELETE
   CASCADE</code>).</li>
@@ -23,9 +28,39 @@ CREATE INDEX bookmarks_search ON bookmarks USING gin (search);</code></pre>
 
 <h2>Tags in, tags out</h2>
 <p><code>Bookmark</code> and <code>NewBookmark</code> get a <code>vec.Vec&lt;String&gt; tags</code>: a JSON array, and a
-PostgreSQL <code>text[]</code> array as well. <code>COLUMNS</code> collects each bookmark's tags into one:</p>
-<pre><code>(SELECT coalesce(array_agg(tag ORDER BY tag), '{}') FROM tags WHERE bookmark_id = id) AS tags</code></pre>
-<p>Creating a bookmark now writes two tables, so it happens in a transaction: both rows or neither.</p>
+PostgreSQL <code>text[]</code> array as well. <code>COLUMNS</code> collects each bookmark's tags into one with a
+subquery:</p>
+<pre><code>@json struct Bookmark {
+    String id;
+    String url;
+    String title;
+    String notes;
+    vec.Vec<String> tags;
+    String createdAt;
+};
+
+@json struct NewBookmark {
+    @required @url @max(2048) u8[] url;
+    @max(200) u8[] title;
+    @max(2000) u8[] notes;
+    vec.Vec<String> tags;
+};
+
+/* The columns of a Bookmark, named as its fields */
+#define COLUMNS "id, url, title, notes, " \
+    "(SELECT coalesce(array_agg(tag ORDER BY tag), '{}') FROM tags WHERE bookmark_id = id) AS tags, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS \"createdAt\""</code></pre>
+<p>A tag is checked by hand: the rules of chapter 3 check fields, and this is about each element of one.</p>
+<pre><code>/* A tag is 1 to 30 lowercase letters, digits and dashes */
+bool goodTag(u8[] t)
+{
+    if (t.len < 1 || t.len > 30) { return false; }
+    for (auto c : t) {
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')) { return false; }
+    }
+    return true;
+}</code></pre>
+<p>Creating a bookmark now writes two tables, so it happens in a transaction: both rows or neither. The whole
+<code>create</code>:</p>
 <pre><code>void create(http.Writer *w, http.Request *r)
 {
     pg.Pool *db = r.app;
@@ -63,11 +98,18 @@ PostgreSQL <code>text[]</code> array as well. <code>COLUMNS</code> collects each
   <li><code>db.begin()</code> takes a connection from the pool for the transaction; <code>defer tx.rollback()</code>
   undoes it on any way out except after <code>tx.commit()</code>, a 409 included.</li>
   <li><code>unnest($2::text[])</code> turns the array parameter (the vector, sent as one value) into rows.</li>
-  <li><code>goodTag</code> checks each tag by hand: the rules of chapter 3 check fields, and this is about each
-  element of one.</li>
+  <li>The bookmark is read back with <code>pg.queryOne</code> on <code>&amp;tx</code>, inside the transaction, so
+  its tags are already there.</li>
 </ul>
 
 <h2>Filtering, search and pages</h2>
+<p>The list is no longer an array but a page of it, with the cursor for the next page:</p>
+<pre><code>/* A page of bookmarks: `next` is the cursor for the page after it */
+@json struct Page {
+    vec.Vec<Bookmark> items;
+    @omitEmpty String next;
+};</code></pre>
+<p>The whole <code>list</code>:</p>
 <pre><code>/* GET /bookmarks?tag=go&q=fast+servers&limit=20&after=<cursor>: newest first */
 void list(http.Writer *w, http.Request *r)
 {
@@ -126,4 +168,222 @@ $ curl 'localhost:8080/bookmarks?limit=2&after=01a13b0c-c310-7000-9e76-a5045a430
 
 $ curl -X POST localhost:8080/bookmarks -d '{"url": "https://x.org", "tags": ["Bad Tag"]}'
 {"error":"a tag is 1 to 30 lowercase letters, digits and dashes"}</code></pre>
+<h2>The whole program</h2>
+<p>The program at the end of this chapter, to check yours against:</p>
+<details class="code"><summary>main.ktm</summary>
+<pre><code>import "github.com/ozzenerol/ktm-pg";
+import "github.com/ozzenerol/ktm-migrate";
+import "github.com/ozzenerol/ktm-migrate/postgres";
+import config, flag, json, log, net.http, os, reflect, str, uuid, vec;
+
+@json struct Bookmark {
+    String id;
+    String url;
+    String title;
+    String notes;
+    vec.Vec<String> tags;
+    String createdAt;
+};
+
+/* A page of bookmarks: `next` is the cursor for the page after it */
+@json struct Page {
+    vec.Vec<Bookmark> items;
+    @omitEmpty String next;
+};
+
+@json struct NewBookmark {
+    @required @url @max(2048) u8[] url;
+    @max(200) u8[] title;
+    @max(2000) u8[] notes;
+    vec.Vec<String> tags;
+};
+
+/* The columns of a Bookmark, named as its fields */
+#define COLUMNS "id, url, title, notes, " \
+    "(SELECT coalesce(array_agg(tag ORDER BY tag), '{}') FROM tags WHERE bookmark_id = id) AS tags, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS \"createdAt\""
+
+/* GET /bookmarks?tag=go&q=fast+servers&limit=20&after=<cursor>: newest first */
+void list(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    i64 limit = 20;
+    if (r.hasQuery("limit") && (!str.toInt(r.query("limit"), &limit) || limit < 1 || limit > 100)) {
+        w.error(400, "limit is 1 to 100");
+        return;
+    }
+    uuid.UUID after;
+    u8[] cursor = r.query("after");
+    if (cursor.len && !uuid.parse(cursor, &after)) {
+        w.error(400, "after isn't a cursor from this API");
+        return;
+    }
+    Page page;
+    defer page.freeDecoded();
+    /* one more than asked for: if it comes back, there is a next page */
+    page.items = pg.queryAll<Bookmark>(db,
+        "SELECT " COLUMNS " FROM bookmarks"
+        " WHERE ($1 = '' OR id IN (SELECT bookmark_id FROM tags WHERE tag = $1))"
+        "   AND ($2 = '' OR search @@ websearch_to_tsquery('simple', $2))"
+        "   AND ($3 = '' OR id < $3::uuid)"
+        " ORDER BY id DESC LIMIT $4",
+        r.query("tag"), r.query("q"), cursor, limit + 1);
+    if (page.items.len > limit) {
+        Bookmark extra = page.items.removeAt(limit);
+        pg.free(reflect.of(extra));
+        page.next = str.from(page.items.data[limit - 1].id[0:]);
+    }
+    w.json(200, reflect.of(page));
+}
+
+/* A tag is 1 to 30 lowercase letters, digits and dashes */
+bool goodTag(u8[] t)
+{
+    if (t.len < 1 || t.len > 30) { return false; }
+    for (auto c : t) {
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')) { return false; }
+    }
+    return true;
+}
+
+/* The id in the path, or false (and a 404) when it isn't a UUID */
+bool pathId(http.Writer *w, http.Request *r, uuid.UUID *id)
+{
+    if (uuid.parse(r.param("id"), id)) { return true; }
+    w.error(404, "no such bookmark");
+    return false;
+}
+
+void get(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID id;
+    if (!pathId(w, r, &id)) { return; }
+    Bookmark b;
+    try {
+        b = pg.queryOne<Bookmark>(db, "SELECT " COLUMNS " FROM bookmarks WHERE id = $1", r.param("id"));
+    } catch (Error e) {
+        if (e.code != pg.ERR_NO_ROWS) { throw(e); }
+        w.error(404, "no such bookmark");
+        return;
+    }
+    defer b.freeDecoded();
+    w.json(200, reflect.of(b));
+}
+
+void create(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    NewBookmark in = http.decodeValid<NewBookmark>(r);
+    if (in.tags.len > 10) {
+        w.error(422, "at most 10 tags");
+        return;
+    }
+    for (auto t : in.tags) {
+        if (!goodTag(t[0:])) {
+            w.error(422, "a tag is 1 to 30 lowercase letters, digits and dashes");
+            return;
+        }
+    }
+    String id = uuid.v7().string();
+    defer id.free();
+    /* the bookmark and its tags together, or neither */
+    pg.Tx tx = db.begin();
+    defer tx.rollback();
+    try {
+        tx.exec("INSERT INTO bookmarks (id, url, title, notes) VALUES ($1, $2, $3, $4)",
+                id, in.url, in.title.len ? in.title : in.url, in.notes);
+    } catch (Error e) {
+        if (e.code != pg.UNIQUE_VIOLATION) { throw(e); }
+        w.error(409, "that link is already on the shelf");
+        return;
+    }
+    tx.exec("INSERT INTO tags (bookmark_id, tag) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING", id, in.tags);
+    Bookmark b = pg.queryOne<Bookmark>(&tx, "SELECT " COLUMNS " FROM bookmarks WHERE id = $1", id);
+    defer b.freeDecoded();
+    tx.commit();
+    w.json(201, reflect.of(b));
+}
+
+void remove(http.Writer *w, http.Request *r)
+{
+    pg.Pool *db = r.app;
+    uuid.UUID id;
+    if (!pathId(w, r, &id)) { return; }
+    if (db.exec("DELETE FROM bookmarks WHERE id = $1", r.param("id")) == 0) {
+        w.error(404, "no such bookmark");
+        return;
+    }
+    w.status(204);
+}
+
+/* shelf migrate up | down | status */
+i32 runMigrate(migrate.Migrations *ms, migrate.Driver *d, u8[] what)
+{
+    if (str.equals(what, "up")) {
+        printf("%d migrations ran\n", ms.up(d));
+    } else if (str.equals(what, "down")) {
+        printf("%d migration reverted\n", ms.down(d, 1));
+    } else if (str.equals(what, "status")) {
+        vec.Vec<migrate.Status> all = ms.status(d);
+        for (auto s : all) {
+            printf("%4d  %-22s %s\n", s.version, s.name, s.applied ? "applied" : "pending");
+        }
+        all.free();
+    } else {
+        log.error("shelf migrate: up, down or status, not `%s`", what);
+        return 2;
+    }
+    return 0;
+}
+
+struct Settings {
+    i64 port;
+    bool accessLog;
+    @required u8[] databaseUrl;
+};
+
+Settings gSettings;
+
+i32 main(i32 argc, u8 **argv)
+{
+    gSettings.port = 8080;
+    config.loadDotenv(".env");
+    try {
+        config.fromEnv(reflect.of(gSettings), "SHELF_");
+    } catch (Error e) {
+        log.error("%s", e.message);     /* every bad or missing variable, by name */
+        os.exit(2);
+    }
+
+    flag.Set *flags = flag.new("shelf", "a bookmarks API");
+    defer flags.free();
+    i64 *port = flags.integer("port", gSettings.port, "the port to listen on", 'p');
+    bool *accessLog = flags.boolean("access-log", gSettings.accessLog, "log every request");
+    flag.Set *migrateCmd = flags.command("migrate", "up, down or status, then exit");
+    flags.parseOrExit(argc, argv);
+
+    /* the database: a pool of connections shared by every thread */
+    pg.Pool *db = pg.open(gSettings.databaseUrl);
+    defer db.close();
+    migrate.Migrations ms = migrate.load("migrations");
+    defer ms.free();
+    migrate.Driver d = postgres.driverPool(db);
+    if (flags.chosen() == migrateCmd) {
+        return runMigrate(&ms, &d, migrateCmd.arg(0));
+    }
+    i64 ran = ms.up(&d);
+    log.info("database at version %d (%d migrations ran)", migrate.version(&d), ran);
+
+    http.Mux mux;
+    mux.handle("GET /bookmarks", &list);
+    mux.handle("POST /bookmarks", &create);
+    mux.handle("GET /bookmarks/{id}", &get);
+    mux.handle("DELETE /bookmarks/{id}", &remove);
+
+    http.Options o;
+    o.accessLog = *accessLog;
+    log.info("Shelf listening on http://localhost:%d", *port);
+    return http.listen((i32)*port, &mux, db, &o);
+}</code></pre>
+</details>
 <p>Next: <a href="guide-http-08-users.html">Users and sessions</a>.</p>

@@ -6,22 +6,23 @@
 <title>3. Validation and errors - ktm</title>
 <meta name="color-scheme" content="light dark">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/style.css?v=c4e8d50ba8">
 <script>
 (function () {
   var t = new URLSearchParams(location.search).get("theme");
   try { if (!t) t = localStorage.getItem("ktm-theme"); } catch (e) {}
   if (t !== "light") t = "dark";   // dark unless light was chosen
   document.documentElement.setAttribute("data-theme", t);
+  try { if (localStorage.getItem("ktm-side") === "closed") document.documentElement.classList.add("side-closed"); } catch (e) {}
 })();
 </script>
 <script src="assets/search-index.js" defer></script>
-<script src="assets/docs.js" defer></script>
+<script src="assets/docs.js?v=9467e22335" defer></script>
 </head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
 <header class="topbar">
-  <button class="menu" type="button" aria-label="Show the page list" aria-expanded="false" aria-controls="sidebar">
+  <button class="menu" type="button" aria-label="Show or hide the page list" aria-expanded="false" aria-controls="sidebar">
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
   </button>
   <a class="wordmark" href="index.html" aria-label="ktm home"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 21C8 40 22 56 56 61C39 50 30 36 35 14Z" fill="#d7262e" stroke="#d7262e" stroke-width="2" stroke-linejoin="round"/><path d="M17.5 26C15.5 38 24 49 39 55" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.6" stroke-linecap="round"/><path d="M12 22L37 15L35 8L10 15Z" fill="#e2a72e" stroke="#e2a72e" stroke-width="2.5" stroke-linejoin="round"/><circle cx="22.5" cy="6.8" r="3.3" fill="none" stroke="#e2a72e" stroke-width="2.4"/></svg><span class="logo-name">ktm</span></a>
@@ -58,12 +59,12 @@
 request's fields fix the first two, and a check in the handler the third.</p>
 
 <h2 id="rules-on-fields">Rules on fields<a class="anchor" href="#rules-on-fields" aria-label="Link to this section">#</a></h2>
-<p>Only <code>NewBookmark</code> and one line of <code>create</code> change:</p>
+<p>Only <code>NewBookmark</code> and <code>create</code> change. The struct gets rules, and <code>create</code>
+(below) reads the body with <code>http.decodeValid</code> instead of <code>http.decode</code>:</p>
 <pre><code>@json struct NewBookmark {
     @required @url @max(2048) u8[] url;
     @max(200) u8[] title;
 };</code></pre>
-<pre><code>    NewBookmark in = http.decodeValid&lt;NewBookmark&gt;(r);    /* a 422 by itself when a rule fails */</code></pre>
 <p><code>http.decodeValid</code> decodes as <code>http.decode</code> does, then checks the rules. When one fails, the
 handler stops there and the client gets a 422 that names each field and what is wrong with it:</p>
 <pre><code>$ curl -X POST localhost:8080/bookmarks -d '{"url": "not a link", "title": "x"}'
@@ -115,6 +116,99 @@ client handles them in one place:</p>
 </table></div>
 <p>The last row is worth knowing: a handler that throws doesn't take the server down. The request gets a 500, the log
 gets the error and the line it came from, and the next request is served as usual.</p>
+<h2 id="the-whole-program">The whole program<a class="anchor" href="#the-whole-program" aria-label="Link to this section">#</a></h2>
+<p>The program at the end of this chapter, to check yours against:</p>
+<details class="code"><summary>main.ktm</summary>
+<pre><code>import date, json, net.http, reflect, str, uuid, vec;
+
+/* A saved link */
+@json struct Bookmark {
+    String id;
+    String url;
+    String title;
+    String createdAt;
+};
+
+/* What a client sends to save one */
+@json struct NewBookmark {
+    @required @url @max(2048) u8[] url;
+    @max(200) u8[] title;
+};
+
+/* Every bookmark, in memory for now (chapter 5 moves them to PostgreSQL) */
+vec.Vec&lt;Bookmark&gt; gBookmarks;
+
+/* The index of the bookmark with this id, or -1 */
+i64 find(u8[] id)
+{
+    for (i64 i = 0; i &lt; gBookmarks.len; i++) {
+        if (str.equals(gBookmarks.data[i].id[0:], id)) { return i; }
+    }
+    return -1;
+}
+
+void list(http.Writer *w, http.Request *r)
+{
+    w.json(200, reflect.of(gBookmarks));
+}
+
+void get(http.Writer *w, http.Request *r)
+{
+    i64 i = find(r.param("id"));
+    if (i &lt; 0) {
+        w.error(404, "no such bookmark");
+        return;
+    }
+    w.json(200, reflect.of(gBookmarks.data[i]));
+}
+
+void create(http.Writer *w, http.Request *r)
+{
+    NewBookmark in = http.decodeValid&lt;NewBookmark&gt;(r);    /* a 422 by itself when a rule fails */
+    for (i64 i = 0; i &lt; gBookmarks.len; i++) {
+        if (str.equals(gBookmarks.data[i].url[0:], in.url)) {
+            w.error(409, "that link is already on the shelf");
+            return;
+        }
+    }
+    Bookmark b;
+    b.id = uuid.v7().string();
+    b.url = str.from(in.url);
+    b.title = str.from(in.title.len ? in.title : in.url);   /* no title yet: the link itself */
+    b.createdAt = date.formatUnix(date.unixNow(), "%Y-%m-%dT%H:%M:%SZ");
+    gBookmarks.push(b);
+    w.json(201, reflect.of(b));
+}
+
+void remove(http.Writer *w, http.Request *r)
+{
+    i64 i = find(r.param("id"));
+    if (i &lt; 0) {
+        w.error(404, "no such bookmark");
+        return;
+    }
+    Bookmark b = gBookmarks.removeAt(i);
+    b.id.free();
+    b.url.free();
+    b.title.free();
+    b.createdAt.free();
+    w.status(204);
+}
+
+i32 main()
+{
+    http.Mux mux;
+    mux.handle("GET /bookmarks", &amp;list);
+    mux.handle("POST /bookmarks", &amp;create);
+    mux.handle("GET /bookmarks/{id}", &amp;get);
+    mux.handle("DELETE /bookmarks/{id}", &amp;remove);
+
+    http.Options o;
+    o.threads = 1;      /* one loop: the list in memory isn't shared between threads */
+    printf("Shelf listening on http://localhost:8080\n");
+    return http.listen(8080, &amp;mux, null, &amp;o);
+}</code></pre>
+</details>
 <p>Next: <a href="guide-http-04-config.html">Configuration</a>.</p>
 
     <nav class="prev-next" aria-label="Previous and next page"><a class="prev" href="guide-http-02-json.html"><span>Previous</span>2. JSON in and out</a><a class="next" href="guide-http-04-config.html"><span>Next</span>4. Configuration</a></nav>
@@ -123,7 +217,7 @@ gets the error and the line it came from, and the next request is served as usua
       by <code>docs/tools/check-examples.py</code>.</p>
     </footer>
   </main>
-  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#rules-on-fields">Rules on fields</a></li><li><a href="#rules-that-need-the-data">Rules that need the data</a></li><li><a href="#the-error-format">The error format</a></li></ul></nav>
+  <nav class="onpage" aria-label="On this page"><p>On this page</p><ul><li><a href="#rules-on-fields">Rules on fields</a></li><li><a href="#rules-that-need-the-data">Rules that need the data</a></li><li><a href="#the-error-format">The error format</a></li><li><a href="#the-whole-program">The whole program</a></li></ul></nav>
 </div>
 </body>
 </html>
