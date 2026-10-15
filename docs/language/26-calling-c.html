@@ -23,7 +23,7 @@
       <kbd>/</kbd>
       <ul id="site-results" class="results" hidden></ul>
     </div>
-    <span class="ver">v0.23.1</span>
+    <span class="ver">v0.23.2</span>
     <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
   </div>
 </header>
@@ -197,7 +197,18 @@ a.txt: ok</code></pre>
 }</code></pre>
 <pre class="out"><code>the program&#x27;s own free
 done</code></pre>
-<p><code>mem.free</code> still releases the memory with C's <code>free</code>: the program's <code>free</code> is the symbol <code>_K04free</code>, not <code>free</code>. Within the program, though, keep such names apart from the modules it calls: a program function named like a module's function can be picked up by a call to the module's (a known bug, being fixed), so prefer names of your own.</p>
+<p><code>mem.free</code> still releases the memory with C's <code>free</code>: the program's <code>free</code> is the symbol <code>_K04free</code>, not <code>free</code>. The same holds the other way round in one program: a module's C function is called by the module's name for it, so <code>libc.strlen</code> is C's <code>strlen</code> even next to a <code>strlen</code> of the program's own.</p>
+<pre class="code run"><code><span class="k">import</span> libc;
+
+<span class="t">u64</span> strlen(<span class="t">u8</span> *s) {
+    <span class="k">return</span> <span class="n">1000</span>;
+}
+
+<span class="t">i32</span> main() {
+    printf(<span class="s">&quot;%d %d\n&quot;</span>, strlen(<span class="s">&quot;four&quot;</span>), libc.strlen(<span class="s">&quot;four&quot;</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>1000 4</code></pre>
 <ul><li>A prototype without <code>extern &quot;c&quot;</code> is a ktm function, which must be defined in the program or in a ktm library; linking fails otherwise.</li><li>In a module, an <code>extern &quot;c&quot;</code> declaration is the module's name (private unless <code>pub</code>) but keeps its C symbol.</li><li>An <code>extern &quot;c&quot;</code> function has one C symbol and can't be overloaded.</li></ul>
 <h2 id="rules"><a href="#rules">Rules</a></h2>
 <ul><li><code>extern &quot;c&quot; T name(params);</code> declares a C function; <code>extern &quot;c&quot; T name;</code> a C global; <code>_extern SYMBOL declaration</code> binds a declaration to an exact symbol.</li><li>The prototype must match C's; ktm doesn't check it against C.</li><li>C structs are declared with the same fields in the same order.</li><li>ktm functions use C's calling convention and can be C callbacks.</li><li><code>libc</code> is always linked; other libraries come with <code>#link</code> or <code>-clibs</code>.</li><li>ktm's names never clash with C's symbols.</li></ul>
@@ -207,7 +218,7 @@ done</code></pre>
 </div>
 <footer>
   <div class="bar">
-    <span>ktm v0.23.1</span>
+    <span>ktm v0.23.2</span>
     <a href="../releases.html">Releases</a>
     <a href="../known-issues.html">Known issues</a>
     <a href="../roadmap.html">Roadmap</a>
