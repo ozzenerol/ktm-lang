@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Run every example of the docs (docs-src/language/*.md, docs-src/std/*.md).
+"""Run every example of the docs (docs-src/language/*.md, docs-src/guides/*.md,
+docs-src/std/*.md).
 
 Each example is the file example.ktm in a directory of its own (so what a
 program prints about its own file is the same on every run). A ```ktm run
@@ -96,6 +97,7 @@ def main():
     if not (os.access(args.ktm, os.X_OK) or shutil.which(args.ktm)):
         sys.exit(f"ktm not found at {args.ktm}; run ./build.sh first, or pass --ktm")
     files = args.files or sorted(glob.glob(os.path.join(ROOT, "docs-src", "language", "*.md")) +
+                                 glob.glob(os.path.join(ROOT, "docs-src", "guides", "*.md")) +
                                  glob.glob(os.path.join(ROOT, "docs-src", "std", "*.md")))
     work = [(f, ex) for f in files for ex in examples(f)]
     failed = 0

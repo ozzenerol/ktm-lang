@@ -11,6 +11,7 @@ docs-src/
   pages/releases.html     release notes (an HTML fragment, kept as it was)
   pages/known-issues.html the known bugs (an HTML fragment)
   language/NN-name.md     the language chapters, in order (NN = 01, 02, ...)
+  guides/NN-name.md       the quick guides, in order (same format as a chapter)
   std/modules.json        the standard library's module groups and one-line summaries
   assets/                 style.css, site.js, std.js (copied to docs/assets)
   tools/                  build.py, md.py, gen_std.py, man.py, check.py
@@ -79,3 +80,11 @@ Rules for writing:
 - Use the current syntax: `i64`, `u8 *`, `printf`, `if x > 0 {` or `if (x > 0) {` (both are ktm;
   pick one per chapter, the chapter on control flow shows both).
 - Link to other chapters by file name (`07-structs.html`) and to the library by `../std/#module.name`.
+
+## A quick guide
+
+`docs-src/guides/NN-name.md`, under Quick Guides in the top bar. A guide is one task from an
+empty directory to a program that works, in the same Markdown as a chapter. Every file is shown
+whole, every command with what it prints. A guide's programs usually need packages (`ktm get`),
+which `check.py` can't fetch, so they are ` ```ktm ` blocks: build each one in a real project and
+run every command before committing, and again when a package it uses changes.
