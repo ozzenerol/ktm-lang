@@ -36,7 +36,9 @@ struct WinSize { u16 rows; u16 cols; u16 xpixel; u16 ypixel; };
 static u8 gSaved[256];
 static vec.Vec<String> gHist;
 static i64 gHistMax = 1000;
-static String gHistPath;
+/* the history file's path, kept without allocating */
+static u8 gHistPath[4096];
+static i64 gHistPathLen;
 static bool gHistManual;
 
 static i64 termCols() {
@@ -106,10 +108,10 @@ pub void historyAdd(u8[] line) {
     if (gHist.len && str.equals(gHist.data[gHist.len - 1][0:], line)) { return; }
     if (str.find(line, "\n") >= 0) { return; }
     histPush(line);
-    if (gHistPath.len) {
+    if (gHistPathLen) {
         String rec = str.from(line);
         rec.appendByte('\n');
-        fs.writeAll(gHistPath[0:], rec[0:], libc.O_CREAT | libc.O_WRONLY | libc.O_APPEND);
+        fs.writeAll(gHistPath[0:gHistPathLen], rec[0:], libc.O_CREAT | libc.O_WRONLY | libc.O_APPEND);
         rec.free();
     }
 }
@@ -117,8 +119,10 @@ pub void historyAdd(u8[] line) {
 /* Keeps the history in a file: reads the lines in it now (none when it
  * doesn't exist yet) and appends every line added from now on */
 pub void historyFile(u8[] path) {
-    gHistPath.free();
-    gHistPath = str.from(path);
+    gHistPathLen = 0;
+    if (path.len >= 4096) { return; }
+    mem.copy(gHistPath, path.ptr, path.len);
+    gHistPathLen = path.len;
     scoped String all = fs.readAll(path);
     if (!all.ptr) { return; }
     u8[] rest = all[0:];
@@ -172,10 +176,11 @@ pub u8[] historyAt(i64 i) {
     return gHist.data[i][0:];
 }
 
-/* Empties the history in memory (the file keeps its lines) */
+/* Empties the history in memory and frees what it held (the file keeps
+ * its lines, and lines added later still go into it) */
 pub void historyClear() {
     for (i64 i = 0; i < gHist.len; i++) { gHist.data[i].free(); }
-    gHist.clear();
+    gHist.free();
 }
 
 /* ---- the screen ---- */

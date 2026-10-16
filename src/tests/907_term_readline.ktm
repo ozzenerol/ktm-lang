@@ -38,6 +38,12 @@ i32 main() {
     scoped String saved = fs.readAll("__907_hist");
     check(str.equals(saved[0:], "a\nb\r\n\nc\nd\n"), "historyAdd appends to the file");
     term.historyClear();
+    check(term.historyLen() == 0, "historyClear empties the history");
+    term.historyAdd("e");
+    scoped String after = fs.readAll("__907_hist");
+    check(term.historyLen() == 1 && str.equals(after[0:], "a\nb\r\n\nc\nd\ne\n"),
+          "after historyClear lines still go into the file");
+    term.historyClear();
     fs.remove("__907_hist");
 
     fs.writeAll("__907_prog.ktm",
