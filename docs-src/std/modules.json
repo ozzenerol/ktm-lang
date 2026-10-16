@@ -36,6 +36,7 @@
       {"name": "proc", "title": "Processes", "summary": "Shell commands, and running programs by argv without a shell, with pipes."},
       {"name": "signal", "title": "Signals", "summary": "sigaction-based handlers and a clean-shutdown helper."},
       {"name": "flag", "title": "Flags", "summary": "Command-line flags as Go's flag package, with GNU's forms, subcommands and a help text."},
+      {"name": "term", "title": "Terminal output", "summary": "Colors written as markup, status lines, lined-up tables and a progress bar, off by themselves in a pipe."},
       {"name": "config", "title": "Settings", "summary": "Environment variables and a .env file into a struct: @env, @required, defaults."},
       {"name": "log", "title": "Logging", "summary": "Leveled logging to stderr or a file, with size rotation and thread safety."},
       {"name": "testing", "title": "Testing", "summary": "Tests run by ktm test: testing.T with check, equal, fail, fatal, skip and log."}
