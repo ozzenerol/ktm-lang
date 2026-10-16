@@ -29,7 +29,7 @@
   </div>
 </header>
 <div class="doc">
-  <aside class="chapters" aria-label="Chapters"><h4>Quick Guides</h4><ol><li><a href="01-database-migrations.html" class="on"><span class="num">1</span>Database migrations</a></li><li><a href="02-logging.html"><span class="num">2</span>Logging</a></li><li><a href="03-sqlite.html"><span class="num">3</span>SQLite</a></li><li><a href="04-postgresql.html"><span class="num">4</span>PostgreSQL</a></li><li><a href="05-flags.html"><span class="num">5</span>Command-line flags</a></li></ol></aside>
+  <aside class="chapters" aria-label="Chapters"><h4>Quick Guides</h4><ol><li><a href="01-database-migrations.html" class="on"><span class="num">1</span>Database migrations</a></li><li><a href="02-logging.html"><span class="num">2</span>Logging</a></li><li><a href="03-sqlite.html"><span class="num">3</span>SQLite</a></li><li><a href="04-postgresql.html"><span class="num">4</span>PostgreSQL</a></li><li><a href="05-flags.html"><span class="num">5</span>Command-line flags</a></li><li><a href="06-terminal-output.html"><span class="num">6</span>Terminal output</a></li></ol></aside>
   <article class="prose">
 <h1>Database migrations</h1>
 <p>Keep a database's schema in numbered SQL files and let your program bring any database up to date with <a href="https://github.com/ozzenerol/ktm-migrate">ktm-migrate</a>. This guide builds a small notes program on SQLite, step by step: the first migrations, status, going back, migrating at start-up, changes SQLite can't make with <code>ALTER TABLE</code>, failures, tests and migrations built into the binary. Then the same program on PostgreSQL, several instances starting at once, migrations from merged branches, and a driver of your own.</p>

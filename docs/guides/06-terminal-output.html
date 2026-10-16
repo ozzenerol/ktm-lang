@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terminal output - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html">Language</a>
+      <a href="../guides/index.html" class="on">Quick Guides</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.26.0</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Quick Guides</h4><ol><li><a href="01-database-migrations.html"><span class="num">1</span>Database migrations</a></li><li><a href="02-logging.html"><span class="num">2</span>Logging</a></li><li><a href="03-sqlite.html"><span class="num">3</span>SQLite</a></li><li><a href="04-postgresql.html"><span class="num">4</span>PostgreSQL</a></li><li><a href="05-flags.html"><span class="num">5</span>Command-line flags</a></li><li><a href="06-terminal-output.html" class="on"><span class="num">6</span>Terminal output</a></li></ol></aside>
+  <article class="prose">
+<h1>Terminal output</h1>
+<p>Make a command-line program's output easy to read with the standard library's <code>term</code> module: colors, lines that say what happened, tables whose columns line up, and a progress bar. This guide shows each one, then puts them together in a small report. Every step is a whole program you can build and run.</p>
+<h2 id="what-you-need"><a href="#what-you-need">What you need</a></h2>
+<p>Any ktm from v0.27.0. <code>term</code> is part of the standard library, so there is nothing to fetch. Every program in this guide is one file, <code>app.ktm</code>, built and run like this:</p>
+<pre class="code"><code>ktm app.ktm -o app
+./app</code></pre>
+<p>Run the programs in a terminal to see the colors. The outputs below are what a pipe or a file gets: the same text, without colors. The next section but one says why.</p>
+<h2 id="colors"><a href="#colors">Colors</a></h2>
+<p><code>term.print</code> is <code>printf</code> with colors. Put the words of a color in square brackets before the text, and <code>[/]</code> after it:</p>
+<pre class="code run"><code><span class="k">import</span> term;
+
+<span class="t">i32</span> main() {
+    term.print(<span class="s">&quot;[green]passed[/] 12 tests\n&quot;</span>);
+    term.print(<span class="s">&quot;[bold red]failed[/] 2 tests\n&quot;</span>);
+    term.print(<span class="s">&quot;[yellow]skipped[/] %d tests in %s\n&quot;</span>, <span class="n">3</span>, <span class="s">&quot;net/http&quot;</span>);
+    term.print(<span class="s">&quot;[dim]took 1.4s[/]\n&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>passed 12 tests
+failed 2 tests
+skipped 3 tests in net/http
+took 1.4s</code></pre>
+<p>In a terminal, <code>passed</code> is green, <code>failed</code> bold and red, <code>skipped</code> yellow and the last line dim.</p>
+<div class="table"><table><thead><tr><th>Words</th><th>What they do</th></tr></thead><tbody><tr><td><code>black</code>, <code>red</code>, <code>green</code>, <code>yellow</code>, <code>blue</code>, <code>magenta</code>, <code>cyan</code>, <code>white</code>, <code>gray</code></td><td>the text's color</td></tr><tr><td><code>on red</code>, <code>on blue</code>, ... (any color)</td><td>the background</td></tr><tr><td><code>bold</code>, <code>dim</code>, <code>italic</code>, <code>underline</code>, <code>reverse</code>, <code>strike</code></td><td>the style</td></tr></tbody></table></div>
+<ul><li>A tag can hold several words: <code>[bold red]</code>, <code>[white on blue]</code>, <code>[underline cyan]</code>.</li><li><code>[/]</code> closes the last tag that is still open, so tags can nest: <code>[bold]total: [green]ok[/] in 3s[/]</code> keeps <code>in 3s</code> bold.</li><li>A tag still open at the end of the text is closed there, so a color never runs into the next line.</li><li><code>%d</code>, <code>%s</code> and the rest work as in <code>printf</code>. The values are written as they are, never read as markup: a file called <code>[red]</code> prints as <code>[red]</code>.</li><li>Square brackets around anything else stay as they are: <code>[1, 2]</code>, <code>[ok]</code>. To write a word of the markup in brackets, double the opening one: <code>[[red]</code> prints <code>[red]</code>.</li><li><code>term.eprint</code> is the same for stderr.</li></ul>
+<h2 id="lines-that-say-what-happened"><a href="#lines-that-say-what-happened">Lines that say what happened</a></h2>
+<p>Four calls write one line each, after a symbol in its color. They add the newline:</p>
+<pre class="code run"><code><span class="k">import</span> term;
+
+<span class="t">i32</span> main() {
+    term.title(<span class="s">&quot;Deploying shop v2.4.0&quot;</span>);
+    term.info(<span class="s">&quot;building %d services&quot;</span>, <span class="n">3</span>);
+    term.success(<span class="s">&quot;api is up&quot;</span>);
+    term.success(<span class="s">&quot;web is up&quot;</span>);
+    term.warn(<span class="s">&quot;worker took %ds to start&quot;</span>, <span class="n">41</span>);
+    term.error(<span class="s">&quot;can&#x27;t reach %s&quot;</span>, <span class="s">&quot;db.internal:5432&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>Deploying shop v2.4.0
+• building 3 services
+✓ api is up
+✓ web is up
+! worker took 41s to start
+✗ can&#x27;t reach db.internal:5432</code></pre>
+<div class="table"><table><thead><tr><th>Call</th><th>Symbol</th><th>Where</th></tr></thead><tbody><tr><td><code>term.success(fmt, ...)</code></td><td>a green <code>✓</code></td><td>stdout</td></tr><tr><td><code>term.info(fmt, ...)</code></td><td>a blue <code>•</code></td><td>stdout</td></tr><tr><td><code>term.warn(fmt, ...)</code></td><td>a yellow <code>!</code></td><td>stderr</td></tr><tr><td><code>term.error(fmt, ...)</code></td><td>a red <code>✗</code></td><td>stderr</td></tr><tr><td><code>term.title(fmt, ...)</code></td><td>none: the line is bold</td><td>stdout</td></tr></tbody></table></div>
+<p>Warnings and errors go to stderr, so <code>./app &gt; report.txt</code> keeps them on the screen and the report clean. The message can hold markup too: <code>term.error(&quot;can&#x27;t reach [bold]%s[/]&quot;, host)</code>.</p>
+<h2 id="when-there-are-no-colors"><a href="#when-there-are-no-colors">When there are no colors</a></h2>
+<p>Colors are escape codes: bytes a terminal reads as "turn green". In a file they are noise, so <code>term</code> only writes them to a terminal. For each of stdout and stderr, colors are:</p>
+<ul><li>on when it is a terminal;</li><li>off when it is a pipe or a file (<code>./app | less</code>, <code>./app &gt; out.txt</code>);</li><li>off when the <code>NO_COLOR</code> environment variable is set, which is the <a href="https://no-color.org">standard way</a> for a user to turn them off everywhere;</li><li>off when <code>TERM</code> is <code>dumb</code>, as in some editors' terminals;</li><li>on when <code>FORCE_COLOR</code> is set (and isn't <code>0</code>), for CI logs that show colors.</li></ul>
+<p>With colors off, the markup is removed and the text stays, as in the outputs on this page. A program can decide itself with <code>term.setColors</code>, and ask with <code>term.colors()</code>:</p>
+<pre class="code run"><code><span class="k">import</span> term;
+
+<span class="t">i32</span> main() {
+    term.print(<span class="s">&quot;colors on stdout: %s\n&quot;</span>, term.colors() ? <span class="s">&quot;yes&quot;</span> : <span class="s">&quot;no&quot;</span>);
+
+    term.setColors(<span class="k">true</span>);
+    <span class="t">String</span> ok = term.format(<span class="s">&quot;[green]ok[/]&quot;</span>);
+    printf(<span class="s">&quot;with colors, \&quot;ok\&quot; takes %d bytes\n&quot;</span>, ok.len);
+    ok.free();
+
+    term.setColors(<span class="k">false</span>);
+    term.print(<span class="s">&quot;[green]never green[/]\n&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>colors on stdout: no
+with colors, &quot;ok&quot; takes 11 bytes
+never green</code></pre>
+<ul><li>The output is a pipe here, so <code>term.colors()</code> says no. It answers for stdout.</li><li><code>term.setColors(true)</code> turns colors on for stdout and stderr, whatever they are. The two letters then take 11 bytes: 5 to turn green, 2 for <code>ok</code> and 4 to turn back. Use it for a <code>--color</code> flag that the user asked for, and not otherwise.</li><li><code>term.setColors(false)</code> turns them off, even in a terminal.</li></ul>
+<h2 id="tables"><a href="#tables">Tables</a></h2>
+<p><code>term.table</code> takes the column headers. <code>t.row</code> adds a row, and <code>t.print</code> writes the table with its columns lined up:</p>
+<pre class="code run"><code><span class="k">import</span> term;
+
+<span class="t">i32</span> main() {
+    term.Table *t = term.table(<span class="s">&quot;SERVICE&quot;</span>, <span class="s">&quot;STATUS&quot;</span>, <span class="s">&quot;CPU %&quot;</span>, <span class="s">&quot;MEMORY MB&quot;</span>);
+    t.row(<span class="s">&quot;api&quot;</span>, <span class="s">&quot;[green]running[/]&quot;</span>, <span class="n">12.5</span>, <span class="n">512</span>);
+    t.row(<span class="s">&quot;web&quot;</span>, <span class="s">&quot;[green]running[/]&quot;</span>, <span class="n">3.25</span>, <span class="n">128</span>);
+    t.row(<span class="s">&quot;worker&quot;</span>, <span class="s">&quot;[red]stopped[/]&quot;</span>, <span class="n">0</span>, <span class="n">0</span>);
+    t.print();
+    t.free();
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>SERVICE  STATUS   CPU %  MEMORY MB
+api      running   12.5        512
+web      running   3.25        128
+worker   stopped      0          0</code></pre>
+<ul><li>The headers are bold in a terminal.</li><li>A cell can be text, a whole number, a number with a fraction, a <code>bool</code>, an enum (its member's name) or a <code>String</code>. Numbers are written as <code>printf</code>'s <code>%g</code> writes them.</li><li>A column whose cells are all numbers lines up on the right, so the digits line up. Any other column lines up on the left.</li><li>Text cells can hold markup. The colors don't count in the width, so the columns still line up.</li><li>Columns are two spaces apart, and no line ends in spaces.</li><li><code>t.free()</code> frees the table and its cells.</li></ul>
+<h3 id="lining-up-and-borders"><a href="#lining-up-and-borders">Lining up and borders</a></h3>
+<p><code>t.align</code> puts one column on the left, the right or the center. <code>t.border</code> draws lines around the cells, or makes a Markdown table to paste into a README or an issue:</p>
+<pre class="code run"><code><span class="k">import</span> term;
+
+<span class="k">enum</span> Plan { free, team, business };
+
+<span class="t">i32</span> main() {
+    term.Table *t = term.table(<span class="s">&quot;CUSTOMER&quot;</span>, <span class="s">&quot;PLAN&quot;</span>, <span class="s">&quot;SEATS&quot;</span>, <span class="s">&quot;ACTIVE&quot;</span>);
+    t.row(<span class="s">&quot;Acme&quot;</span>, Plan.business, <span class="n">120</span>, <span class="k">true</span>);
+    t.row(<span class="s">&quot;Globex&quot;</span>, Plan.team, <span class="n">14</span>, <span class="k">true</span>);
+    t.row(<span class="s">&quot;Initech&quot;</span>, Plan.free, <span class="n">1</span>, <span class="k">false</span>);
+    t.align(<span class="n">1</span>, term.Align.center);
+
+    t.border = term.Border.box;
+    t.print();
+
+    t.border = term.Border.markdown;
+    t.print();
+    t.free();
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>╭──────────┬──────────┬───────┬────────╮
+│ CUSTOMER │   PLAN   │ SEATS │ ACTIVE │
+├──────────┼──────────┼───────┼────────┤
+│ Acme     │ business │   120 │ true   │
+│ Globex   │   team   │    14 │ true   │
+│ Initech  │   free   │     1 │ false  │
+╰──────────┴──────────┴───────┴────────╯
+| CUSTOMER |   PLAN   | SEATS | ACTIVE |
+| -------- | -------: | ----: | ------ |
+| Acme     | business |   120 | true   |
+| Globex   |   team   |    14 | true   |
+| Initech  |   free   |     1 | false  |</code></pre>
+<ul><li>Columns count from 0: <code>t.align(1, ...)</code> is <code>PLAN</code>.</li><li><code>term.Align</code> is <code>left</code>, <code>right</code> or <code>center</code>.</li><li><code>term.Border</code> is <code>none</code> (the default), <code>box</code> or <code>markdown</code>. A Markdown table never has colors, and its second line says how each column lines up.</li></ul>
+<h3 id="a-table-without-a-header-and-a-table-as-text"><a href="#a-table-without-a-header-and-a-table-as-text">A table without a header, and a table as text</a></h3>
+<p><code>term.table()</code> with no headers makes a table without a header line: a list of names and values. <code>t.format()</code> gives the table as a <code>String</code> instead of printing it, to write it to a file or put it in a message:</p>
+<pre class="code run"><code><span class="k">import</span> term;
+
+<span class="t">i32</span> main() {
+    term.Table *t = term.table();
+    t.row(<span class="s">&quot;version&quot;</span>, <span class="s">&quot;2.4.0&quot;</span>);
+    t.row(<span class="s">&quot;commit&quot;</span>, <span class="s">&quot;a91f3c2&quot;</span>);
+    t.row(<span class="s">&quot;built&quot;</span>, <span class="s">&quot;2026-10-16&quot;</span>);
+
+    <span class="t">String</span> text = t.format();
+    printf(<span class="s">&quot;%d bytes:\n%.*s&quot;</span>, text.len, text.len, text.ptr);
+    text.free();
+    t.free();
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>52 bytes:
+version  2.4.0
+commit   a91f3c2
+built    2026-10-16</code></pre>
+<p><code>t.format()</code> has no colors. <code>t.format(true)</code> keeps them, for a String that goes to the terminal. <code>t.rows()</code> says how many rows were added.</p>
+<h2 id="a-progress-bar"><a href="#a-progress-bar">A progress bar</a></h2>
+<p><code>term.progress</code> takes a label and the number of steps. <code>p.add()</code> says one more step is done, and <code>p.done()</code> ends the bar and frees it:</p>
+<pre class="code run"><code><span class="k">import</span> term;
+
+<span class="t">i32</span> main() {
+    <span class="t">i64</span> files = <span class="n">240</span>;
+    term.Progress *p = term.progress(<span class="s">&quot;copying&quot;</span>, files);
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; files; i++) {
+        <span class="c">/* copy one file here */</span>
+        p.add();
+    }
+    p.done();
+    term.success(<span class="s">&quot;copied %d files&quot;</span>, files);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>✓ copied 240 files
+copying  ██████████████████████████████  100%  240/240  0.0s</code></pre>
+<p>In a terminal, the bar is drawn on one line and redrawn in place as the work goes on:</p>
+<pre class="code"><code>copying  ███████████████░░░░░░░░░░░░░░░   50%  120/240</code></pre>
+<p>At <code>p.done()</code> it is drawn full, with the time the work took, and the program goes on below it.</p>
+<ul><li>The bar goes to stderr, like the warnings, so stdout stays for the program's real output.</li><li>It is redrawn when its percent changes, or after 100 ms, so a loop of a million steps costs about a hundred redraws, not a million.</li><li>Lines written with <code>term.print</code>, <code>term.info</code> and the others while the bar runs go above it, and the bar is drawn again under them.</li><li>In a pipe or a file there is nothing to redraw, so only the last line is written, at <code>p.done()</code>. That is why it comes after the <code>✓</code> line above: stdout and stderr are two streams, and this page shows stdout first.</li><li><code>p.add(n)</code> adds <code>n</code> steps, and <code>p.set(n)</code> says how many are done in all.</li></ul>
+<h2 id="putting-it-together"><a href="#putting-it-together">Putting it together</a></h2>
+<p>A program that checks a few services and reports on them, with each part of <code>term</code> where it fits:</p>
+<pre class="code run"><code><span class="k">import</span> term;
+
+<span class="k">struct</span> Service {
+    <span class="t">u8</span> *name;
+    <span class="t">u8</span> *host;
+    <span class="t">i64</span> ms;         <span class="c">/* how long it took to answer; -1: no answer */</span>
+};
+
+<span class="t">i32</span> main() {
+    Service services[<span class="n">5</span>] = {
+        {<span class="s">&quot;api&quot;</span>, <span class="s">&quot;api.internal:8080&quot;</span>, <span class="n">12</span>},
+        {<span class="s">&quot;web&quot;</span>, <span class="s">&quot;web.internal:80&quot;</span>, <span class="n">48</span>},
+        {<span class="s">&quot;search&quot;</span>, <span class="s">&quot;search.internal:9200&quot;</span>, <span class="n">730</span>},
+        {<span class="s">&quot;db&quot;</span>, <span class="s">&quot;db.internal:5432&quot;</span>, -<span class="n">1</span>},
+        {<span class="s">&quot;cache&quot;</span>, <span class="s">&quot;cache.internal:6379&quot;</span>, <span class="n">2</span>},
+    };
+
+    term.title(<span class="s">&quot;Checking %d services&quot;</span>, <span class="n">5</span>);
+    term.Progress *p = term.progress(<span class="s">&quot;checking&quot;</span>, <span class="n">5</span>);
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">5</span>; i++) {
+        <span class="c">/* ask services[i] here */</span>
+        p.add();
+    }
+    p.done();
+
+    term.Table *t = term.table(<span class="s">&quot;SERVICE&quot;</span>, <span class="s">&quot;HOST&quot;</span>, <span class="s">&quot;STATUS&quot;</span>, <span class="s">&quot;MS&quot;</span>);
+    <span class="t">i64</span> down = <span class="n">0</span>, slow = <span class="n">0</span>;
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">5</span>; i++) {
+        Service *s = &amp;services[i];
+        <span class="k">if</span> (s.ms &lt; <span class="n">0</span>) {
+            t.row(s.name, s.host, <span class="s">&quot;[red]down[/]&quot;</span>, <span class="s">&quot;-&quot;</span>);
+            down++;
+        } <span class="k">else</span> <span class="k">if</span> (s.ms &gt; <span class="n">500</span>) {
+            t.row(s.name, s.host, <span class="s">&quot;[yellow]slow[/]&quot;</span>, s.ms);
+            slow++;
+        } <span class="k">else</span> {
+            t.row(s.name, s.host, <span class="s">&quot;[green]up[/]&quot;</span>, s.ms);
+        }
+    }
+    t.align(<span class="n">3</span>, term.Align.right);
+    t.print();
+    t.free();
+
+    <span class="k">if</span> (slow) {
+        term.warn(<span class="s">&quot;%d service answered slowly&quot;</span>, slow);
+    }
+    <span class="k">if</span> (down) {
+        term.error(<span class="s">&quot;%d service is down&quot;</span>, down);
+        <span class="k">return</span> <span class="n">1</span>;
+    }
+    term.success(<span class="s">&quot;all services are up&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>Checking 5 services
+SERVICE  HOST                  STATUS   MS
+api      api.internal:8080     up       12
+web      web.internal:80       up       48
+search   search.internal:9200  slow    730
+db       db.internal:5432      down      -
+cache    cache.internal:6379   up        2
+checking  ██████████████████████████████  100%  5/5  0.0s
+! 1 service answered slowly
+✗ 1 service is down</code></pre>
+<ul><li>The <code>MS</code> column holds a <code>-</code> for the service that didn't answer. That makes it a text column, which would line up on the left, so <code>t.align(3, term.Align.right)</code> keeps it on the right.</li><li>The program ends with exit code 1 when a service is down, so a script or a CI job can tell.</li></ul>
+<h2 id="reference"><a href="#reference">Reference</a></h2>
+<div class="table"><table><thead><tr><th>Call</th><th>What it does</th></tr></thead><tbody><tr><td><code>term.print(fmt, ...)</code></td><td><code>printf</code> to stdout, with markup in <code>fmt</code></td></tr><tr><td><code>term.eprint(fmt, ...)</code></td><td>the same, to stderr</td></tr><tr><td><code>term.format(fmt, ...)</code></td><td>the same, into a new <code>String</code> (colors as stdout has them)</td></tr><tr><td><code>term.success</code>, <code>term.info</code></td><td>one line on stdout after a green <code>✓</code> or a blue <code>•</code></td></tr><tr><td><code>term.warn</code>, <code>term.error</code></td><td>one line on stderr after a yellow <code>!</code> or a red <code>✗</code></td></tr><tr><td><code>term.title(fmt, ...)</code></td><td>one bold line on stdout</td></tr><tr><td><code>term.colors()</code></td><td>does stdout get colors?</td></tr><tr><td><code>term.setColors(on)</code></td><td>colors on or off for stdout and stderr, whatever they are</td></tr><tr><td><code>term.width(text)</code></td><td>the columns <code>text</code> takes on a terminal, without its markup</td></tr><tr><td><code>term.table(headers...)</code></td><td>a new table; no headers for a table without a header line</td></tr><tr><td><code>t.row(cells...)</code></td><td>one row: text, numbers, bools, enums or Strings</td></tr><tr><td><code>t.align(col, a)</code></td><td><code>term.Align.left</code>, <code>right</code> or <code>center</code> for column <code>col</code> (from 0)</td></tr><tr><td><code>t.border</code></td><td><code>term.Border.none</code>, <code>box</code> or <code>markdown</code></td></tr><tr><td><code>t.print()</code></td><td>writes the table to stdout</td></tr><tr><td><code>t.format(colors)</code></td><td>the table as a new <code>String</code>; <code>colors</code> is <code>false</code> when left out</td></tr><tr><td><code>t.rows()</code>, <code>t.free()</code></td><td>how many rows; frees the table</td></tr><tr><td><code>term.progress(label, total)</code></td><td>a progress bar on stderr</td></tr><tr><td><code>p.add(n)</code>, <code>p.set(n)</code></td><td><code>n</code> more steps done (1 when left out); <code>n</code> steps done in all</td></tr><tr><td><code>p.done()</code></td><td>the last line, with the time taken; frees the bar</td></tr></tbody></table></div>
+<p>The whole module is in the <a href="../std/#term.print">library reference</a>.</p>
+<h2 id="rules-of-thumb"><a href="#rules-of-thumb">Rules of thumb</a></h2>
+<ul><li><strong>Color a word, not a line.</strong> <code>[red]failed[/] 2 tests</code> is easier to read than a whole red line.</li><li><strong>Give each color one meaning</strong> and keep it: green for done, yellow for a warning, red for an error. Color only adds to the text: <code>failed</code> still has to say it, for the people and the files that don't see the color.</li><li><strong>Results to stdout, everything about them to stderr.</strong> The <code>term</code> calls already do this: tables and <code>success</code> lines are output, warnings, errors and the progress bar are not.</li><li><strong>Never force colors on.</strong> Leave the choice to <code>term</code> and the user's <code>NO_COLOR</code>, unless the user asked for colors with a flag.</li><li><strong>Put numbers in a table as numbers</strong>, not as text, so they line up on the right.</li></ul>
+    <nav class="pager"><a class="prev" href="05-flags.html"><span>Previous</span>Command-line flags</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#what-you-need">What you need</a></li><li><a href="#colors">Colors</a></li><li><a href="#lines-that-say-what-happened">Lines that say what happened</a></li><li><a href="#when-there-are-no-colors">When there are no colors</a></li><li><a href="#tables">Tables</a></li><li><a href="#a-progress-bar">A progress bar</a></li><li><a href="#putting-it-together">Putting it together</a></li><li><a href="#reference">Reference</a></li><li><a href="#rules-of-thumb">Rules of thumb</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.26.0</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="../roadmap.html">Roadmap</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>
