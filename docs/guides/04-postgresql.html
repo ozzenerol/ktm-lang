@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html">Language</a>
+      <a href="../guides/index.html" class="on">Quick Guides</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.25.0</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Quick Guides</h4><ol><li><a href="01-database-migrations.html"><span class="num">1</span>Database migrations</a></li><li><a href="02-logging.html"><span class="num">2</span>Logging</a></li><li><a href="03-sqlite.html"><span class="num">3</span>SQLite</a></li><li><a href="04-postgresql.html" class="on"><span class="num">4</span>PostgreSQL</a></li></ol></aside>
+  <article class="prose">
+<h1>PostgreSQL</h1>
+<p>Talk to PostgreSQL from ktm with the <a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a> package. This guide builds up a catalogue of books, one whole program at a time: connecting, running statements with parameters, reading rows into structs, NULLs, rows one by one, transactions, errors, a connection pool behind an HTTP API, batches and fast bulk loading, query timeouts, and LISTEN/NOTIFY.</p>
+<h2 id="what-you-need"><a href="#what-you-need">What you need</a></h2>
+<ul><li><strong>Any ktm.</strong> ktm-pg is written in ktm and speaks Postgres' protocol itself: no libpq, no C library to install.</li><li><strong>A PostgreSQL server</strong>, version 14 or newer. With Docker, one line starts one:</li></ul>
+<pre class="code"><code>docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=secret postgres:17</code></pre>
+<p>Make a project and add the package:</p>
+<pre class="code"><code>mkdir books &amp;&amp; cd books
+ktm mod init example.com/me/books
+ktm get github.com/ozzenerol/ktm-pg</code></pre>
+<p>Every step of this guide is a whole <code>main.ktm</code> for this project. Each one carries on from the tables the last one left, so run them in order. They connect with the server's address from the environment, so set it once in the terminal you build in:</p>
+<pre class="code"><code>export PGHOST=localhost PGUSER=postgres PGPASSWORD=secret PGDATABASE=postgres</code></pre>
+<p>Then build and run each step like this:</p>
+<pre class="code"><code>ktm build
+./books</code></pre>
+<h2 id="connect-and-run-statements"><a href="#connect-and-run-statements">Connect and run statements</a></h2>
+<pre class="code"><code><span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-pg&quot;</span>;
+
+<span class="t">i32</span> main() {
+    pg.Conn *c = pg.connect();      <span class="c">/* PGHOST, PGUSER, PGPASSWORD, PGDATABASE */</span>
+    <span class="k">defer</span> c.close();
+    printf(<span class="s">&quot;connected to PostgreSQL %s\n&quot;</span>, c.serverVersion());
+
+    c.execScript(
+        <span class="s">&quot;CREATE TABLE IF NOT EXISTS books (\n&quot;</span>
+        <span class="s">&quot;    id     bigserial PRIMARY KEY,\n&quot;</span>
+        <span class="s">&quot;    title  text NOT NULL UNIQUE,\n&quot;</span>
+        <span class="s">&quot;    author text NOT NULL,\n&quot;</span>
+        <span class="s">&quot;    year   int\n&quot;</span>
+        <span class="s">&quot;);\n&quot;</span>);
+
+    <span class="t">i64</span> n = c.exec(<span class="s">&quot;INSERT INTO books (title, author, year) VALUES ($1, $2, $3) ON CONFLICT (title) DO NOTHING&quot;</span>,
+                   <span class="s">&quot;Dune&quot;</span>, <span class="s">&quot;Frank Herbert&quot;</span>, <span class="n">1965</span>);
+    printf(<span class="s">&quot;%d row(s) inserted\n&quot;</span>, n);
+
+    <span class="t">i64</span> id = pg.queryOne&lt;<span class="t">i64</span>&gt;(c, <span class="s">&quot;INSERT INTO books (title, author, year) VALUES ($1, $2, $3) &quot;</span>
+                                 <span class="s">&quot;ON CONFLICT (title) DO UPDATE SET year = excluded.year RETURNING id&quot;</span>,
+                              <span class="s">&quot;Neuromancer&quot;</span>, <span class="s">&quot;William Gibson&quot;</span>, <span class="n">1984</span>);
+    printf(<span class="s">&quot;Neuromancer has id %d\n&quot;</span>, id);
+
+    <span class="t">i64</span> count = pg.queryOne&lt;<span class="t">i64</span>&gt;(c, <span class="s">&quot;SELECT count(*) FROM books&quot;</span>);
+    printf(<span class="s">&quot;%d book(s)\n&quot;</span>, count);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm build
+./books</code></pre>
+<pre class="out"><code>connected to PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2)
+1 row(s) inserted
+Neuromancer has id 2
+2 book(s)</code></pre>
+<p>Run it again and nothing is added: <code>ON CONFLICT</code> turns the inserts into no-ops.</p>
+<pre class="code"><code>./books</code></pre>
+<pre class="out"><code>connected to PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2)
+0 row(s) inserted
+Neuromancer has id 2
+2 book(s)</code></pre>
+<ul><li><code>pg.connect()</code> reads the server from <code>PGHOST</code>, <code>PGPORT</code>, <code>PGUSER</code>, <code>PGPASSWORD</code> and <code>PGDATABASE</code>. A URL works too, and wins over the environment: <code>pg.connect(&quot;postgres://postgres:secret@localhost:5432/postgres&quot;)</code>. It throws when it can't connect or log in.</li><li><code>c.close()</code> ends the connection; <code>defer</code> it right after connecting.</li><li><code>c.execScript(sql)</code> runs any number of statements, without parameters: a schema.</li><li><code>c.exec(sql, args...)</code> runs one statement and returns how many rows it changed.</li><li><code>$1</code>, <code>$2</code> ... are parameters, filled from the arguments after the SQL, in order. They are sent apart from the SQL, never pasted into it, so no value can change the statement.</li><li><code>pg.queryOne&lt;T&gt;(c, sql, args...)</code> returns the first column of the one row a query returns, here the new id from <code>RETURNING id</code>.</li><li>Arguments can be integers, floats, <code>bool</code>, strings (<code>u8[]</code>, <code>String</code>, literals), <code>date.Date</code>, structs (sent as JSON), arrays and more; the <a href="https://github.com/ozzenerol/ktm-pg#running-statements">ktm-pg README</a> has the full table.</li></ul>
+<h2 id="read-rows-into-structs"><a href="#read-rows-into-structs">Read rows into structs</a></h2>
+<pre class="code"><code><span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-pg&quot;</span>;
+<span class="k">import</span> reflect, vec;
+
+<span class="k">struct</span> Book {
+    <span class="t">i64</span> id;
+    <span class="t">String</span> title;
+    <span class="t">String</span> author;
+    <span class="t">i64</span> *year;      <span class="c">/* a pointer: null when the column is NULL */</span>
+};
+
+<span class="t">void</span> print(Book *b) {
+    <span class="k">if</span> (b.year) {
+        printf(<span class="s">&quot;%3d  %s, %s (%d)\n&quot;</span>, b.id, b.title.cstr(), b.author.cstr(), *b.year);
+    } <span class="k">else</span> {
+        printf(<span class="s">&quot;%3d  %s, %s (year unknown)\n&quot;</span>, b.id, b.title.cstr(), b.author.cstr());
+    }
+}
+
+<span class="t">i32</span> main() {
+    pg.Conn *c = pg.connect();
+    <span class="k">defer</span> c.close();
+
+    <span class="t">i64</span> *noYear = <span class="k">null</span>;
+    c.exec(<span class="s">&quot;INSERT INTO books (title, author, year) VALUES ($1, $2, $3) ON CONFLICT (title) DO NOTHING&quot;</span>,
+           <span class="s">&quot;Robert&#x27;s Rules&quot;</span>, <span class="s">&quot;Henry M. Robert&quot;</span>, noYear);
+    c.exec(<span class="s">&quot;INSERT INTO books (title, author, year) VALUES ($1, $2, $3) ON CONFLICT (title) DO NOTHING&quot;</span>,
+           <span class="s">&quot;The Left Hand of Darkness&quot;</span>, <span class="s">&quot;Ursula K. Le Guin&quot;</span>, <span class="n">1969</span>);
+
+    <span class="c">/* every row, into a vector of structs */</span>
+    vec.Vec&lt;Book&gt; all = pg.queryAll&lt;Book&gt;(c, <span class="s">&quot;SELECT id, title, author, year FROM books ORDER BY id&quot;</span>);
+    <span class="k">defer</span> pg.free(reflect.of(all));
+    <span class="k">for</span> (<span class="k">auto</span> b : all) {
+        print(&amp;b);
+    }
+
+    <span class="c">/* one row */</span>
+    Book dune = pg.queryOne&lt;Book&gt;(c, <span class="s">&quot;SELECT * FROM books WHERE title = $1&quot;</span>, <span class="s">&quot;Dune&quot;</span>);
+    <span class="k">defer</span> pg.free(reflect.of(dune));
+    printf(<span class="s">&quot;found: &quot;</span>);
+    print(&amp;dune);
+
+    <span class="c">/* no row: queryOne throws pg.ERR_NO_ROWS */</span>
+    <span class="k">try</span> {
+        Book none = pg.queryOne&lt;Book&gt;(c, <span class="s">&quot;SELECT * FROM books WHERE id = $1&quot;</span>, <span class="n">999</span>);
+        pg.free(reflect.of(none));
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        <span class="k">if</span> (e.code == pg.ERR_NO_ROWS) {
+            printf(<span class="s">&quot;no book 999\n&quot;</span>);
+        } <span class="k">else</span> {
+            <span class="k">throw</span>(e);
+        }
+    }
+
+    <span class="c">/* not a struct: the first column */</span>
+    vec.Vec&lt;<span class="t">String</span>&gt; authors = pg.queryAll&lt;<span class="t">String</span>&gt;(c, <span class="s">&quot;SELECT DISTINCT author FROM books ORDER BY author&quot;</span>);
+    <span class="k">defer</span> pg.free(reflect.of(authors));
+    printf(<span class="s">&quot;%d authors, the first is %s\n&quot;</span>, authors.len, authors.data[<span class="n">0</span>].cstr());
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm build
+./books</code></pre>
+<pre class="out"><code>  1  Dune, Frank Herbert (1965)
+  2  Neuromancer, William Gibson (1984)
+  3  Robert&#x27;s Rules, Henry M. Robert (year unknown)
+  4  The Left Hand of Darkness, Ursula K. Le Guin (1969)
+found:   1  Dune, Frank Herbert (1965)
+no book 999
+4 authors, the first is Frank Herbert</code></pre>
+<ul><li><code>pg.queryAll&lt;T&gt;</code> returns every row as a <code>vec.Vec&lt;T&gt;</code>, and <code>pg.queryOne&lt;T&gt;</code> the first row as a <code>T</code>. A <code>T</code> that isn't a struct (<code>i64</code>, <code>String</code>) takes the first column.</li><li>Columns fill the fields with the same name. <code>SELECT *</code> works; a column with no field is left out, and a field with no column stays zero.</li><li>A NULL in an <code>i64</code> field reads as 0. To tell NULL from 0, make the field a pointer: <code>year</code> is <code>null</code> for NULL, and points to the value otherwise.</li><li><code>pg.free(reflect.of(x))</code> frees what scanning allocated: the Strings, the vector, the pointers.</li><li><code>queryOne</code> with no row throws <code>pg.ERR_NO_ROWS</code>. When "none" is a normal answer, <code>queryAll</code> and a check of <code>len</code> read better, as the HTTP section does.</li><li><code>noYear</code> is a null <code>i64 *</code>: a null pointer argument is sent as NULL.</li></ul>
+<h2 id="rows-one-by-one"><a href="#rows-one-by-one">Rows one by one</a></h2>
+<p><code>c.query</code> returns the rows to read one at a time, without building structs. It suits a big result, or one you only print:</p>
+<pre class="code"><code><span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-pg&quot;</span>;
+
+<span class="t">i32</span> main() {
+    pg.Conn *c = pg.connect();
+    <span class="k">defer</span> c.close();
+
+    <span class="k">scoped</span> pg.Rows r = c.query(<span class="s">&quot;SELECT id, title, year FROM books WHERE id &gt; $1 ORDER BY id&quot;</span>, <span class="n">0</span>);
+    printf(<span class="s">&quot;%d columns: %s, %s, %s\n&quot;</span>, r.cols, r.name(<span class="n">0</span>), r.name(<span class="n">1</span>), r.name(<span class="n">2</span>));
+    <span class="k">while</span> (r.next()) {
+        <span class="t">i64</span> id = r.int(<span class="n">0</span>);
+        <span class="t">u8</span>[] title = r.text(<span class="n">1</span>);       <span class="c">/* a view: valid until the next row */</span>
+        <span class="k">if</span> (r.isNull(<span class="n">2</span>)) {
+            printf(<span class="s">&quot;%3d  %s\n&quot;</span>, id, title);
+        } <span class="k">else</span> {
+            printf(<span class="s">&quot;%3d  %s (%d)\n&quot;</span>, id, title, r.int(<span class="n">2</span>));
+        }
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm build
+./books</code></pre>
+<pre class="out"><code>3 columns: id, title, year
+  1  Dune (1965)
+  2  Neuromancer (1984)
+  3  Robert&#x27;s Rules
+  4  The Left Hand of Darkness (1969)</code></pre>
+<ul><li><code>r.next()</code> moves to the next row and returns <code>false</code> after the last.</li><li><code>r.int(i)</code>, <code>r.float(i)</code>, <code>r.bool(i)</code>, <code>r.text(i)</code> and <code>r.bytes(i)</code> read column <code>i</code>; <code>r.isNull(i)</code> tells a NULL apart.</li><li><code>r.text(i)</code> is a view: it is valid until the next row. Copy what you keep with <code>str.from</code>.</li><li><code>scoped</code> frees the rows when the block ends, and reads any that are left first. Until then the connection runs nothing else.</li></ul>
+<h2 id="transactions"><a href="#transactions">Transactions</a></h2>
+<pre class="code"><code><span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-pg&quot;</span>;
+
+<span class="c">/* Moves `amount` from one account to another: both updates, or neither */</span>
+<span class="t">void</span> transfer(pg.Conn *c, <span class="t">u8</span>[] from, <span class="t">u8</span>[] to, <span class="t">i64</span> amount) {
+    pg.Tx tx = c.begin();
+    <span class="k">defer</span> tx.rollback();          <span class="c">/* does nothing once commit() ran */</span>
+    tx.exec(<span class="s">&quot;UPDATE accounts SET balance = balance - $1 WHERE name = $2&quot;</span>, amount, from);
+    tx.exec(<span class="s">&quot;UPDATE accounts SET balance = balance + $1 WHERE name = $2&quot;</span>, amount, to);
+    tx.commit();
+}
+
+<span class="t">void</span> balances(pg.Conn *c) {
+    <span class="k">scoped</span> pg.Rows r = c.query(<span class="s">&quot;SELECT name, balance FROM accounts ORDER BY name&quot;</span>);
+    <span class="k">while</span> (r.next()) {
+        printf(<span class="s">&quot;  %s: %d\n&quot;</span>, r.text(<span class="n">0</span>), r.int(<span class="n">1</span>));
+    }
+}
+
+<span class="t">i32</span> main() {
+    pg.Conn *c = pg.connect();
+    <span class="k">defer</span> c.close();
+
+    c.execScript(
+        <span class="s">&quot;DROP TABLE IF EXISTS accounts;\n&quot;</span>
+        <span class="s">&quot;CREATE TABLE accounts (name text PRIMARY KEY, balance bigint NOT NULL CHECK (balance &gt;= 0));\n&quot;</span>
+        <span class="s">&quot;INSERT INTO accounts VALUES (&#x27;ann&#x27;, 100), (&#x27;bob&#x27;, 20);\n&quot;</span>);
+
+    transfer(c, <span class="s">&quot;ann&quot;</span>, <span class="s">&quot;bob&quot;</span>, <span class="n">30</span>);
+    printf(<span class="s">&quot;after ann -&gt; bob 30:\n&quot;</span>);
+    balances(c);
+
+    <span class="k">try</span> {
+        transfer(c, <span class="s">&quot;bob&quot;</span>, <span class="s">&quot;ann&quot;</span>, <span class="n">500</span>);
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        printf(<span class="s">&quot;bob -&gt; ann 500 failed: %s\n&quot;</span>, e.message);
+    }
+    printf(<span class="s">&quot;after the failed transfer:\n&quot;</span>);
+    balances(c);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm build
+./books</code></pre>
+<pre class="out"><code>after ann -&gt; bob 30:
+  ann: 70
+  bob: 50
+bob -&gt; ann 500 failed: new row for relation &quot;accounts&quot; violates check constraint &quot;accounts_balance_check&quot; (SQLSTATE 23514); detail: Failing row contains (bob, -450).
+after the failed transfer:
+  ann: 70
+  bob: 50</code></pre>
+<ul><li><code>c.begin()</code> starts a transaction and returns a <code>pg.Tx</code>, with the same <code>exec</code>, <code>query</code> and <code>execScript</code> as a connection. <code>pg.queryAll</code> and <code>pg.queryOne</code> take <code>&amp;tx</code> too.</li><li><code>tx.commit()</code> makes the changes stay. <code>defer tx.rollback();</code> right after <code>begin</code> undoes them when anything throws first, and does nothing after a commit.</li><li>The second transfer took bob below zero, so the <code>CHECK</code> failed. The error went up through <code>transfer</code>, the deferred rollback undid the first <code>UPDATE</code> too, and <code>main</code> caught it.</li><li><code>c.begin(&quot;ISOLATION LEVEL SERIALIZABLE&quot;)</code> picks a stricter isolation level.</li></ul>
+<h2 id="errors"><a href="#errors">Errors</a></h2>
+<p>Every failure throws. For an error from the server, <code>e.code</code> is its SQLSTATE, and ktm-pg names the common ones:</p>
+<pre class="code"><code><span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-pg&quot;</span>;
+
+<span class="c">/* Adds a book; false when one with that title is already there */</span>
+<span class="t">bool</span> addBook(pg.Conn *c, <span class="t">u8</span>[] title, <span class="t">u8</span>[] author) {
+    <span class="k">try</span> {
+        c.exec(<span class="s">&quot;INSERT INTO books (title, author) VALUES ($1, $2)&quot;</span>, title, author);
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        <span class="k">if</span> (e.code == pg.UNIQUE_VIOLATION) {
+            <span class="k">return</span> <span class="k">false</span>;
+        }
+        <span class="k">throw</span>(e);
+    }
+    <span class="k">return</span> <span class="k">true</span>;
+}
+
+<span class="t">i32</span> main() {
+    pg.Conn *c = pg.connect();
+    <span class="k">defer</span> c.close();
+
+    <span class="k">if</span> (!addBook(c, <span class="s">&quot;Dune&quot;</span>, <span class="s">&quot;Frank Herbert&quot;</span>)) {
+        printf(<span class="s">&quot;Dune is already there\n&quot;</span>);
+    }
+
+    <span class="k">try</span> {
+        c.exec(<span class="s">&quot;INSERT INTO books (title) VALUES ($1)&quot;</span>, <span class="s">&quot;No Author&quot;</span>);
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        printf(<span class="s">&quot;%s\n&quot;</span>, e.message);
+    }
+    <span class="k">try</span> {
+        c.exec(<span class="s">&quot;SELECT * FROM book&quot;</span>);
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        printf(<span class="s">&quot;%s\n&quot;</span>, e.message);
+    }
+    printf(<span class="s">&quot;the connection still works: %d books\n&quot;</span>, pg.queryOne&lt;<span class="t">i64</span>&gt;(c, <span class="s">&quot;SELECT count(*) FROM books&quot;</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm build
+./books</code></pre>
+<pre class="out"><code>Dune is already there
+null value in column &quot;author&quot; of relation &quot;books&quot; violates not-null constraint (SQLSTATE 23502); detail: Failing row contains (6, No Author, null, null).
+relation &quot;book&quot; does not exist (SQLSTATE 42P01)
+the connection still works: 4 books</code></pre>
+<ul><li>Named codes: <code>pg.UNIQUE_VIOLATION</code>, <code>pg.FOREIGN_KEY_VIOLATION</code>, <code>pg.NOT_NULL_VIOLATION</code>, <code>pg.CHECK_VIOLATION</code>, <code>pg.SERIALIZATION_FAILURE</code>, <code>pg.DEADLOCK_DETECTED</code>, <code>pg.UNDEFINED_TABLE</code>, <code>pg.UNDEFINED_COLUMN</code>, <code>pg.SYNTAX_ERROR</code>, <code>pg.QUERY_CANCELED</code>, <code>pg.INVALID_PASSWORD</code>, <code>pg.DIVISION_BY_ZERO</code>, <code>pg.IN_FAILED_TRANSACTION</code>. Any other: <code>pg.state(&quot;23505&quot;)</code>.</li><li><code>e.message</code> is the server's message, the SQLSTATE and the detail.</li><li>The client's own errors: <code>pg.ERR_CONNECT</code>, <code>pg.ERR_AUTH</code>, <code>pg.ERR_TLS</code>, <code>pg.ERR_IO</code> (the connection broke), <code>pg.ERR_NO_ROWS</code>, <code>pg.ERR_SCAN</code>, <code>pg.ERR_POOL</code>, <code>pg.ERR_ARG</code>, <code>pg.ERR_CLOSED</code>.</li><li>A failed statement doesn't break the connection: the next one works.</li><li>The id in the NOT NULL message is 6, not 5. A sequence never gives a number back, so the failed inserts used 5 and 6. Ids have gaps; never count on them being dense.</li></ul>
+<h2 id="a-pool-behind-an-http-api"><a href="#a-pool-behind-an-http-api">A pool behind an HTTP API</a></h2>
+<p>A server needs more than one connection: requests arrive together, on several threads. A <code>pg.Pool</code> keeps connections open and lends one to each query. This step turns the catalogue into a small JSON API with <code>net.http</code>:</p>
+<pre class="code"><code><span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-pg&quot;</span>;
+<span class="k">import</span> json, net.http, reflect, str, vec;
+
+<span class="a">@json</span> <span class="k">struct</span> Book {
+    <span class="t">i64</span> id;
+    <span class="t">String</span> title;
+    <span class="t">String</span> author;
+    <span class="t">i64</span> *year;
+};
+
+<span class="a">@json</span> <span class="k">struct</span> NewBook {
+    <span class="t">String</span> title;
+    <span class="t">String</span> author;
+    <span class="t">i64</span> year;
+};
+
+pg.Pool *db;
+
+<span class="c">/* GET /books */</span>
+<span class="t">void</span> listBooks(http.Writer *w, http.Request *r) {
+    vec.Vec&lt;Book&gt; books = pg.queryAll&lt;Book&gt;(db, <span class="s">&quot;SELECT id, title, author, year FROM books ORDER BY id&quot;</span>);
+    <span class="k">defer</span> pg.free(reflect.of(books));
+    w.json(<span class="n">200</span>, reflect.of(books));
+}
+
+<span class="c">/* GET /books/{id} */</span>
+<span class="t">void</span> getBook(http.Writer *w, http.Request *r) {
+    <span class="t">i64</span> id;
+    <span class="k">if</span> (!str.toInt(r.param(<span class="s">&quot;id&quot;</span>), &amp;id)) {
+        w.text(<span class="n">400</span>, <span class="s">&quot;bad id\n&quot;</span>);
+        <span class="k">return</span>;
+    }
+    vec.Vec&lt;Book&gt; found = pg.queryAll&lt;Book&gt;(db, <span class="s">&quot;SELECT id, title, author, year FROM books WHERE id = $1&quot;</span>, id);
+    <span class="k">defer</span> pg.free(reflect.of(found));
+    <span class="k">if</span> (!found.len) {
+        w.text(<span class="n">404</span>, <span class="s">&quot;no book %d\n&quot;</span>, id);
+        <span class="k">return</span>;
+    }
+    w.json(<span class="n">200</span>, reflect.of(found.data[<span class="n">0</span>]));
+}
+
+<span class="c">/* POST /books with {&quot;title&quot;: ..., &quot;author&quot;: ..., &quot;year&quot;: ...} */</span>
+<span class="t">void</span> addBook(http.Writer *w, http.Request *r) {
+    NewBook nb;
+    <span class="k">try</span> {
+        nb = json.decode&lt;NewBook&gt;(r.body);
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        w.text(<span class="n">400</span>, <span class="s">&quot;%s\n&quot;</span>, e.message);
+        <span class="k">return</span>;
+    }
+    <span class="k">defer</span> json.free(reflect.of(nb));
+    <span class="k">try</span> {
+        <span class="t">i64</span> id = pg.queryOne&lt;<span class="t">i64</span>&gt;(db, <span class="s">&quot;INSERT INTO books (title, author, year) VALUES ($1, $2, $3) RETURNING id&quot;</span>,
+                                  nb.title, nb.author, nb.year);
+        w.text(<span class="n">201</span>, <span class="s">&quot;%d\n&quot;</span>, id);
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        <span class="k">if</span> (e.code == pg.UNIQUE_VIOLATION) {
+            w.text(<span class="n">409</span>, <span class="s">&quot;there is already a book called %s\n&quot;</span>, nb.title.cstr());
+            <span class="k">return</span>;
+        }
+        <span class="k">throw</span>(e);
+    }
+}
+
+<span class="t">i32</span> main() {
+    db = pg.open();               <span class="c">/* connects when a query first needs it */</span>
+    <span class="k">defer</span> db.close();
+    db.ping();                    <span class="c">/* a wrong address or password shows here, at start-up */</span>
+
+    http.Mux mux;
+    mux.handle(<span class="s">&quot;GET /books&quot;</span>, &amp;listBooks);
+    mux.handle(<span class="s">&quot;GET /books/{id}&quot;</span>, &amp;getBook);
+    mux.handle(<span class="s">&quot;POST /books&quot;</span>, &amp;addBook);
+    printf(<span class="s">&quot;listening on :8080\n&quot;</span>);
+    <span class="k">return</span> http.listen(<span class="n">8080</span>, &amp;mux);
+}</code></pre>
+<p>Start it:</p>
+<pre class="code"><code>ktm build
+./books</code></pre>
+<p>Then, from a second terminal:</p>
+<pre class="code"><code>curl localhost:8080/books</code></pre>
+<pre class="out"><code>[{&quot;id&quot;:1,&quot;title&quot;:&quot;Dune&quot;,&quot;author&quot;:&quot;Frank Herbert&quot;,&quot;year&quot;:1965},{&quot;id&quot;:2,&quot;title&quot;:&quot;Neuromancer&quot;,&quot;author&quot;:&quot;William Gibson&quot;,&quot;year&quot;:1984},{&quot;id&quot;:3,&quot;title&quot;:&quot;Robert&#x27;s Rules&quot;,&quot;author&quot;:&quot;Henry M. Robert&quot;,&quot;year&quot;:null},{&quot;id&quot;:4,&quot;title&quot;:&quot;The Left Hand of Darkness&quot;,&quot;author&quot;:&quot;Ursula K. Le Guin&quot;,&quot;year&quot;:1969}]</code></pre>
+<pre class="code"><code>curl localhost:8080/books/1
+curl localhost:8080/books/999
+curl localhost:8080/books/x</code></pre>
+<pre class="out"><code>{&quot;id&quot;:1,&quot;title&quot;:&quot;Dune&quot;,&quot;author&quot;:&quot;Frank Herbert&quot;,&quot;year&quot;:1965}
+no book 999
+bad id</code></pre>
+<pre class="code"><code>curl -X POST localhost:8080/books -d &#x27;{&quot;title&quot;: &quot;Hyperion&quot;, &quot;author&quot;: &quot;Dan Simmons&quot;, &quot;year&quot;: 1989}&#x27;
+curl -X POST localhost:8080/books -d &#x27;{&quot;title&quot;: &quot;Hyperion&quot;, &quot;author&quot;: &quot;Dan Simmons&quot;, &quot;year&quot;: 1989}&#x27;
+curl -X POST localhost:8080/books -d &#x27;{&quot;title&quot;: 5}&#x27;</code></pre>
+<pre class="out"><code>7
+there is already a book called Hyperion
+1:11: title: expected a string, got a number</code></pre>
+<p>Stop the server with Ctrl+C.</p>
+<ul><li><code>pg.open()</code> makes a pool for the same server <code>pg.connect</code> would use. It connects only when a query needs a connection; <code>db.ping()</code> connects at once, so a wrong password stops the program at start-up instead of at the first request.</li><li>Everything that takes a connection takes the pool: <code>pg.queryAll&lt;T&gt;(db, ...)</code>, <code>pg.queryOne&lt;T&gt;(db, ...)</code>, <code>db.exec</code>, <code>db.query</code>, <code>db.begin()</code>.</li><li>The pool is safe from every thread of the HTTP server. A query waits for its answer without blocking the thread, which serves other requests meanwhile.</li><li><code>pg.Options</code> sets the pool's size and limits: <code>pg.Options o; o.maxConns = 32; pg.open(&quot;&quot;, &amp;o);</code>. The default is 4 connections per CPU, between 8 and 64.</li><li><code>year</code> is an <code>i64 *</code> in <code>Book</code>, so a NULL year comes out as JSON <code>null</code>.</li><li><code>db.acquire()</code> lends a connection to you alone, for a <code>SET</code> or a temporary table; <code>c.release()</code> gives it back.</li></ul>
+<h2 id="batches-and-bulk-loading"><a href="#batches-and-bulk-loading">Batches and bulk loading</a></h2>
+<p>Each <code>exec</code> waits for its answer before the next one goes out. A batch sends several statements at once, and binary COPY loads many rows faster than any INSERT:</p>
+<pre class="code"><code><span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-pg&quot;</span>;
+<span class="k">import</span> date;
+
+<span class="k">struct</span> Reading {
+    <span class="t">i64</span> sensor;
+    <span class="t">f64</span> celsius;
+};
+
+<span class="t">i32</span> main() {
+    pg.Conn *c = pg.connect();
+    <span class="k">defer</span> c.close();
+    c.execScript(
+        <span class="s">&quot;DROP TABLE IF EXISTS readings;\n&quot;</span>
+        <span class="s">&quot;CREATE TABLE readings (sensor bigint NOT NULL, celsius float8 NOT NULL);\n&quot;</span>);
+
+    <span class="c">/* a batch: several statements in one round trip, all or nothing */</span>
+    pg.Batch b;
+    <span class="k">defer</span> b.free();
+    b.add(<span class="s">&quot;INSERT INTO readings VALUES ($1, $2)&quot;</span>, <span class="n">1</span>, <span class="n">20.5</span>);
+    b.add(<span class="s">&quot;INSERT INTO readings VALUES ($1, $2)&quot;</span>, <span class="n">2</span>, <span class="n">21.0</span>);
+    b.add(<span class="s">&quot;UPDATE readings SET celsius = celsius + $1 WHERE sensor = $2&quot;</span>, <span class="n">0.25</span>, <span class="n">1</span>);
+    <span class="t">i64</span>[] counts = c.execBatch(&amp;b);
+    printf(<span class="s">&quot;batch: %d statements, the last changed %d row(s)\n&quot;</span>, counts.len, counts[counts.len - <span class="n">1</span>]);
+    counts.free();
+
+    <span class="c">/* binary COPY: the fastest way in for many rows */</span>
+    <span class="t">i64</span> t0 = date.monoMs();
+    pg.CopyInto&lt;Reading&gt; in = c.copyInto&lt;Reading&gt;(<span class="s">&quot;readings&quot;</span>);
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">100000</span>; i++) {
+        Reading r;
+        r.sensor = i % <span class="n">50</span>;
+        r.celsius = <span class="n">15.0</span> + (i % <span class="n">100</span>) / <span class="n">10.0</span>;
+        in.put(r);
+    }
+    <span class="t">i64</span> n = in.end();
+    printf(<span class="s">&quot;copied %d rows in %d ms\n&quot;</span>, n, date.monoMs() - t0);
+
+    <span class="t">f64</span> avg = pg.queryOne&lt;<span class="t">f64</span>&gt;(c, <span class="s">&quot;SELECT avg(celsius) FROM readings&quot;</span>);
+    printf(<span class="s">&quot;%d rows, %.2f degrees on average\n&quot;</span>, pg.queryOne&lt;<span class="t">i64</span>&gt;(c, <span class="s">&quot;SELECT count(*) FROM readings&quot;</span>), avg);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm build
+./books</code></pre>
+<pre class="out"><code>batch: 3 statements, the last changed 1 row(s)
+copied 100000 rows in 23 ms
+100002 rows, 19.95 degrees on average</code></pre>
+<ul><li><code>b.add(sql, args...)</code> adds a statement, copying its arguments. <code>c.execBatch(&amp;b)</code> sends them all in one round trip and returns each one's changed-row count, an <code>i64[]</code> that is yours to free.</li><li>The statements of a batch are one transaction: when one fails, its error is thrown and none of them stays.</li><li><code>c.copyInto&lt;T&gt;(&quot;table&quot;)</code> loads rows straight from structs, in Postgres' binary format. The fields name the columns, as when reading. <code>in.put(x)</code> adds a row, <code>in.end()</code> finishes and returns the count, <code>in.abort()</code> gives up and loads nothing.</li><li>On a pool, take a connection for COPY with <code>db.acquire()</code>.</li></ul>
+<h2 id="query-timeouts"><a href="#query-timeouts">Query timeouts</a></h2>
+<pre class="code"><code><span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-pg&quot;</span>;
+
+<span class="t">i32</span> main() {
+    pg.Conn *c = pg.connect();
+    <span class="k">defer</span> c.close();
+
+    c.setQueryTimeout(<span class="n">500</span>);       <span class="c">/* ms, for every query on c from now on */</span>
+    <span class="k">try</span> {
+        c.exec(<span class="s">&quot;SELECT pg_sleep(3)&quot;</span>);
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        <span class="k">if</span> (e.code == pg.QUERY_CANCELED) {
+            printf(<span class="s">&quot;cancelled: %s\n&quot;</span>, e.message);
+        } <span class="k">else</span> {
+            <span class="k">throw</span>(e);
+        }
+    }
+    printf(<span class="s">&quot;the connection still works: %d\n&quot;</span>, pg.queryOne&lt;<span class="t">i64</span>&gt;(c, <span class="s">&quot;SELECT 1 + 1&quot;</span>));
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm build
+./books</code></pre>
+<pre class="out"><code>cancelled: timeout after 500 ms: canceling statement due to user request (SQLSTATE 57014)
+the connection still works: 2</code></pre>
+<ul><li><code>c.setQueryTimeout(ms)</code> limits every query on the connection. A query past it is cancelled on the server and throws <code>pg.QUERY_CANCELED</code>, and the connection stays usable.</li><li>For a pool, set <code>o.queryTimeoutMs</code> in its <code>pg.Options</code>.</li><li><code>?statement_timeout=5s</code> at the end of the URL sets the server's own limit as well.</li></ul>
+<h2 id="listen-and-notify"><a href="#listen-and-notify">LISTEN and NOTIFY</a></h2>
+<p>Postgres can tell a program that something happened, without the program asking over and over:</p>
+<pre class="code"><code><span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-pg&quot;</span>;
+
+<span class="t">i32</span> main() {
+    pg.Conn *listener = pg.connect();     <span class="c">/* a connection of its own for listening */</span>
+    <span class="k">defer</span> listener.close();
+    pg.Conn *c = pg.connect();
+    <span class="k">defer</span> c.close();
+
+    listener.listen(<span class="s">&quot;new_books&quot;</span>);
+
+    <span class="c">/* another program, or a trigger, would do this */</span>
+    c.notify(<span class="s">&quot;new_books&quot;</span>, <span class="s">&quot;Hyperion&quot;</span>);
+    c.exec(<span class="s">&quot;SELECT pg_notify(&#x27;new_books&#x27;, $1)&quot;</span>, <span class="s">&quot;The Fall of Hyperion&quot;</span>);
+
+    pg.Notification n;
+    <span class="k">while</span> (listener.waitNotification(&amp;n, <span class="n">1000</span>)) {     <span class="c">/* false after 1 s with none */</span>
+        printf(<span class="s">&quot;%s: %s\n&quot;</span>, n.channel, n.payload);
+        n.free();
+    }
+    printf(<span class="s">&quot;no more for 1 s\n&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm build
+./books</code></pre>
+<pre class="out"><code>new_books: Hyperion
+new_books: The Fall of Hyperion
+no more for 1 s</code></pre>
+<ul><li><code>listener.listen(channel)</code> subscribes. Notifications sent while the listener is busy are kept until it reads them.</li><li><code>waitNotification(&amp;n, ms)</code> waits for one, up to <code>ms</code>; it returns <code>false</code> when none came. Free each one with <code>n.free()</code>.</li><li><code>c.notify(channel, payload)</code> sends one, as <code>NOTIFY</code> and <code>pg_notify()</code> do in SQL; a trigger can send them too.</li><li>Listen on a connection of its own: from a pool, <code>db.acquire()</code> one and keep it.</li></ul>
+<h2 id="connecting-securely"><a href="#connecting-securely">Connecting securely</a></h2>
+<p>ktm-pg uses TLS when the server offers it (<code>sslmode=prefer</code>, as libpq does). For a server across a network, require it and check the server's certificate:</p>
+<pre class="code"><code>pg.Conn *c = pg.connect(<span class="s">&quot;postgres://app@db.example.com/app?sslmode=verify-full&amp;sslrootcert=/etc/ssl/db-ca.pem&quot;</span>);</code></pre>
+<div class="table"><table><thead><tr><th><code>sslmode</code></th><th>What it does</th></tr></thead><tbody><tr><td><code>disable</code></td><td>never TLS</td></tr><tr><td><code>prefer</code></td><td>TLS when the server has it (the default)</td></tr><tr><td><code>require</code></td><td>TLS, without checking the certificate</td></tr><tr><td><code>verify-ca</code></td><td>TLS, and the certificate must come from a CA in <code>sslrootcert</code></td></tr><tr><td><code>verify-full</code></td><td>as <code>verify-ca</code>, and the certificate must name the host</td></tr></tbody></table></div>
+<p>Passwords are sent with SCRAM-SHA-256, the Postgres default, and with TLS also bound to the connection (SCRAM-SHA-256-PLUS).</p>
+<h2 id="reference"><a href="#reference">Reference</a></h2>
+<div class="table"><table><thead><tr><th>Call</th><th>What it does</th></tr></thead><tbody><tr><td><code>pg.connect(url)</code></td><td>a <code>pg.Conn *</code>; the URL, else the <code>PG*</code> environment</td></tr><tr><td><code>pg.open(url, &amp;opts)</code></td><td>a <code>pg.Pool *</code>, safe from every thread</td></tr><tr><td><code>c.close()</code>, <code>db.close()</code></td><td>ends a connection or a pool</td></tr><tr><td><code>c.exec(sql, args...)</code></td><td>one statement; the rows it changed</td></tr><tr><td><code>c.execScript(sql)</code></td><td>several statements, no parameters</td></tr><tr><td><code>c.query(sql, args...)</code></td><td><code>pg.Rows</code> to read with <code>next()</code></td></tr><tr><td><code>pg.queryAll&lt;T&gt;(db, sql, args...)</code></td><td>every row, as a <code>vec.Vec&lt;T&gt;</code></td></tr><tr><td><code>pg.queryOne&lt;T&gt;(db, sql, args...)</code></td><td>the first row as a <code>T</code>; <code>pg.ERR_NO_ROWS</code> when none</td></tr><tr><td><code>pg.free(reflect.of(x))</code></td><td>frees what scanning allocated</td></tr><tr><td><code>c.begin()</code></td><td>a <code>pg.Tx</code>: <code>commit()</code>, <code>rollback()</code></td></tr><tr><td><code>c.execBatch(&amp;b)</code></td><td>a <code>pg.Batch</code> in one round trip</td></tr><tr><td><code>c.copyInto&lt;T&gt;(table)</code></td><td>binary COPY from structs: <code>put</code>, <code>end</code>, <code>abort</code></td></tr><tr><td><code>c.setQueryTimeout(ms)</code></td><td>a time limit for every query</td></tr><tr><td><code>c.listen(ch)</code>, <code>c.waitNotification(&amp;n, ms)</code>, <code>c.notify(ch, payload)</code></td><td>LISTEN and NOTIFY</td></tr><tr><td><code>db.acquire()</code>, <code>c.release()</code></td><td>a pool's connection to yourself</td></tr></tbody></table></div>
+<p><code>db</code> in the table is a <code>pg.Conn *</code>, a <code>pg.Tx *</code> or a <code>pg.Pool *</code>.</p>
+<h2 id="rules-of-thumb"><a href="#rules-of-thumb">Rules of thumb</a></h2>
+<ul><li>**Values go in <code>$1</code>, <code>$2</code> ..., never into the SQL text.**</li><li><strong>One pool per program</strong>, opened in <code>main</code> and checked with <code>ping()</code> before serving.</li><li>**<code>defer tx.rollback();</code> right after <code>begin()</code>**, and <code>commit()</code> at the end.</li><li><strong>Free scanned values</strong> with <code>pg.free(reflect.of(x))</code>, or scan into <code>pg.queryResult&lt;T&gt;</code> for big results (see the <a href="https://github.com/ozzenerol/ktm-pg#big-results-queryresult">README</a>).</li><li><strong>Set a query timeout</strong> on servers, so one slow query can't hold a request forever.</li><li><strong>Manage the schema with migrations</strong>: the <a href="01-database-migrations.html">database migrations guide</a> covers Postgres too.</li></ul>
+    <nav class="pager"><a class="prev" href="03-sqlite.html"><span>Previous</span>SQLite</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#what-you-need">What you need</a></li><li><a href="#connect-and-run-statements">Connect and run statements</a></li><li><a href="#read-rows-into-structs">Read rows into structs</a></li><li><a href="#rows-one-by-one">Rows one by one</a></li><li><a href="#transactions">Transactions</a></li><li><a href="#errors">Errors</a></li><li><a href="#a-pool-behind-an-http-api">A pool behind an HTTP API</a></li><li><a href="#batches-and-bulk-loading">Batches and bulk loading</a></li><li><a href="#query-timeouts">Query timeouts</a></li><li><a href="#listen-and-notify">LISTEN and NOTIFY</a></li><li><a href="#connecting-securely">Connecting securely</a></li><li><a href="#reference">Reference</a></li><li><a href="#rules-of-thumb">Rules of thumb</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.25.0</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="../roadmap.html">Roadmap</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>
