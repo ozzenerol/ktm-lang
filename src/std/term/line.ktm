@@ -386,14 +386,32 @@ pub bool readLine(u8[] prompt, String *out) {
     libc.fflush(libc.stdout);
     Edit e;
     render(&e.prompt, prompt, colorOn(1));
-    if (!editable() || !rawOn()) {
+    if (!editable()) {
         put(e.prompt[0:]);
         e.prompt.free();
         bool ok = plainLine(out);
         if (ok && !gHistManual) { historyAdd((*out)[0:]); }
         return ok;
     }
-    e.promptW = width(prompt);
+    /* a prompt of several lines: the ones before the last are written
+     * once, and only the last is redrawn with the line */
+    i64 nl = str.findLast(e.prompt[0:], "\n");
+    if (nl >= 0) {
+        put(e.prompt[0:nl + 1]);
+        e.prompt.remove(0, nl + 1);
+    }
+    if (!rawOn()) {
+        put(e.prompt[0:]);
+        e.prompt.free();
+        bool ok = plainLine(out);
+        if (ok && !gHistManual) { historyAdd((*out)[0:]); }
+        return ok;
+    }
+    String plain;
+    render(&plain, prompt, false);
+    i64 pnl = str.findLast(plain[0:], "\n");
+    e.promptW = str.runeCount(plain[pnl + 1:]);
+    plain.free();
     for (i64 i = 0; i < gHist.len; i++) { e.hist.push(gHist.data[i].clone()); }
     e.hist.push(str.from(""));
     e.hidx = e.hist.len - 1;
