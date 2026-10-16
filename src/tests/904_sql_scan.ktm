@@ -1,6 +1,7 @@
 import cstr, reflect, sql, str, test, vec;
 
-/* v0.26.0: db.exec(query, args...), sql.queryAll<T>, sql.queryOne<T>:
+/* v0.26.0: db.exec(query, args...), sql.queryAll<T>, sql.queryOne<T>,
+ * db.errorCode():
  * `?` parameters from arguments of any supported type, rows into
  * structs by column name (or one value from column 0), NULL into a
  * pointer field as null, and every failure thrown (ERR_SQL, ERR_NO_ROWS,
@@ -106,6 +107,11 @@ i32 main() {
         msg = str.from(cstr.view(e.message));
     }
     check(code == sql.ERR_SQL && msg.contains("UNIQUE constraint failed: books.TITLE"), "ERR_SQL with SQLite's message");
+    check(db.errorCode() == sql.CONSTRAINT_UNIQUE, "errorCode: CONSTRAINT_UNIQUE");
+    try { db.exec("INSERT INTO books (id) VALUES (?)", 9); } catch (Error e) { }
+    check(db.errorCode() == sql.CONSTRAINT_NOTNULL, "errorCode: CONSTRAINT_NOTNULL");
+    try { sql.queryOne<i64>(db, "INSERT INTO books (title) VALUES (?) RETURNING id", "Dune"); } catch (Error e) { }
+    check(db.errorCode() == sql.CONSTRAINT_UNIQUE, "errorCode after queryOne");
     msg.free();
 
     check(thrown(db, "SELEC 1") == sql.ERR_SQL, "a syntax error");

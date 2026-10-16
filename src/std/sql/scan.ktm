@@ -34,6 +34,15 @@ pub const i64 ERR_SCAN = 0x73716C03;
  * that doesn't match the `?`s, or a null database */
 pub const i64 ERR_ARG = 0x73716C04;
 
+/* What db.errorCode() answers after an ERR_SQL for a broken constraint
+ * (SQLite's extended result codes) */
+pub const i64 CONSTRAINT_CHECK = 275;
+pub const i64 CONSTRAINT_FOREIGNKEY = 787;
+pub const i64 CONSTRAINT_NOTNULL = 1299;
+pub const i64 CONSTRAINT_PRIMARYKEY = 1555;
+pub const i64 CONSTRAINT_UNIQUE = 2067;
+
+pub extern "c" i32 sqlite3_extended_errcode(sqlite3 *db);
 pub extern "c" u8 *sqlite3_column_name(sqlite3_stmt *stmt, i32 iCol);
 pub extern "c" i32 sqlite3_column_count(sqlite3_stmt *stmt);
 pub extern "c" i32 sqlite3_changes(sqlite3 *db);
@@ -169,6 +178,14 @@ pub i64 Db.exec(u8[] query, any ...args) {
     sqlite3_finalize(st);
     if (rc != SQLITE_DONE) { sqlFail(self, query); }
     return sqlite3_changes(self.conn);
+}
+
+/* Why the last call on this connection failed, as SQLite's extended
+ * result code: after an ERR_SQL, compare it with sql.CONSTRAINT_UNIQUE
+ * and the others, sql.SQLITE_BUSY ...
+ *   catch (Error e) { if (db.errorCode() == sql.CONSTRAINT_UNIQUE) { ... } } */
+pub i64 Db.errorCode() {
+    return sqlite3_extended_errcode(self.conn);
 }
 
 /* The rowid of the last row this connection inserted */
