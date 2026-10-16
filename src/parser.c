@@ -3207,9 +3207,15 @@ void parseAssertContainerHasFields(Cctrl *cc, AstType *size_field,
     parseCheckPrivateField(cc, entries_field, "entries", 7);
 }
 
+/* Set before parseCreateForRange for a map: the body starts with
+ * `if (!x.live) continue;` */
+static int range_skip_dead = 0;
+
 Ast *parseCreateForRange(Cctrl *cc, Ast *iteratee,
                          Ast *size_ref, Ast *entries_ref)
 {
+    int skip_dead = range_skip_dead;
+    range_skip_dead = 0;
     AoStr *range_tmp_var = getRangeLoopIdx();
     Ast *counter_var = astLVar(astTypeCopy(ast_int_type),range_tmp_var->data,
                                range_tmp_var->len);
@@ -3232,6 +3238,17 @@ Ast *parseCreateForRange(Cctrl *cc, Ast *iteratee,
     Ast *step = astUnaryOperator(astTypeCopy(ast_int_type),AST_UN_OP_PRE_INC,counter_var);
     parseRangeLoopClose(cc);
     Ast *forbody = parseRangeLoopBody(cc,iterator);
+    if (skip_dead) {
+        AstType *live_type = mapGetLen(iteratee->type->fields, str_lit("live"));
+        Ast *live = astClassRef(live_type, iteratee, "live");
+        Ast *dead = astUnaryOperator(astTypeCopy(ast_int_type), AST_UN_OP_LOG_NOT, live);
+        Ast *skip = astIf(dead, astContinue(cc->tmp_loop_begin), NULL);
+        /* after the declaration of the loop variable, before the body */
+        List *stms = forbody->stms;
+        listDeque(stms);                /* the declaration, put back first */
+        listPrepend(stms, skip);
+        listPrepend(stms, iterator);
+    }
     return astFor(counter,cond,step,forbody,NULL,NULL,NULL);
 }
 
@@ -3279,6 +3296,38 @@ Ast *parseRangeLoop(Cctrl *cc, Ast *iteratee) {
             loop->forinit = astCompountStatement(init);
         }
         return loop;
+    }
+    /* a map.Map<K, V>: a struct with `entries` and `nentries` whose
+     * entries have a `live` flag, held by value or through a pointer. The
+     * loop variable is each live entry (`e.key`, `e.value`), in insertion
+     * order; deleted entries are skipped. */
+    {
+        AstType *st = container->type;
+        int through_ptr = st && st->kind == AST_TYPE_POINTER;
+        if (through_ptr) st = st->ptr;
+        AstType *n_field = st && st->kind == AST_TYPE_CLASS && st->fields
+                         ? mapGetLen(st->fields, str_lit("nentries")) : NULL;
+        AstType *ent_field = n_field ? mapGetLen(st->fields, str_lit("entries")) : NULL;
+        AstType *live_field = ent_field && ent_field->kind == AST_TYPE_POINTER &&
+                              ent_field->ptr->kind == AST_TYPE_CLASS && ent_field->ptr->fields
+                            ? mapGetLen(ent_field->ptr->fields, str_lit("live")) : NULL;
+        if (live_field && astIsIntType(n_field) && (container->kind == AST_LVAR ||
+                                                    container->kind == AST_GVAR ||
+                                                    container->kind == AST_CLASS_REF ||
+                                                    through_ptr)) {
+            Ast *base = through_ptr ? astUnaryOperator(st, AST_UN_OP_DEREF, container) : container;
+            Ast *n_ref = astClassRef(n_field, base, "nentries");
+            Ast *ent_ref = astClassRef(ent_field, base, "entries");
+            if (iteratee->type->kind == AST_TYPE_AUTO) iteratee->type = ent_field->ptr;
+            if (iteratee->type->kind != AST_TYPE_CLASS ||
+                !mapGetLen(iteratee->type->fields, str_lit("live"))) {
+                cctrlRaiseException(cc, "a map's range for gives its entries: write `for (auto %s : ...)` "
+                        "and use `%s.key` and `%s.value`", iteratee->lname->data,
+                        iteratee->lname->data, iteratee->lname->data);
+            }
+            range_skip_dead = 1;
+            return parseCreateForRange(cc, iteratee, n_ref, ent_ref);
+        }
     }
     /* a struct with `len` and `data` (vec.Vec<T>), held by value or
      * through a pointer: data[0] to data[len - 1] */
@@ -3342,6 +3391,15 @@ Ast *parseRangeLoop(Cctrl *cc, Ast *iteratee) {
 
         AstType *size_field = mapGetLen(fields, str_lit("size"));
         AstType *entries_field = mapGetLen(fields, str_lit("entries"));
+
+        /* `for (auto e : m.entries)` on a map.Map: the map itself is what
+         * ranges */
+        if (!size_field && fields && mapGetLen(fields, str_lit("live")) &&
+            mapGetLen(fields, str_lit("key")) && mapGetLen(fields, str_lit("value"))) {
+            cctrlRaiseException(cc, "range over the map itself, not its `entries`: "
+                    "`for (auto %s : m)` gives each entry, as `%s.key` and `%s.value`",
+                    iteratee->lname->data, iteratee->lname->data, iteratee->lname->data);
+        }
 
         parseAssertContainerHasFields(cc,size_field,entries_field);
 
