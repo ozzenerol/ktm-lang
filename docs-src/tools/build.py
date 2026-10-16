@@ -4,6 +4,8 @@
   docs/index.html              docs-src/pages/index.html (the home page)
   docs/language/index.html     the chapters, listed
   docs/language/NN-name.html   docs-src/language/NN-name.md
+  docs/guides/index.html       the quick guides, listed
+  docs/guides/NN-name.html     docs-src/guides/NN-name.md
   docs/std/index.html          the library browser (docs-src/assets/std.js)
   docs/std/data.js             the library's API, from src/std (gen_std.py)
   docs/releases.html           docs-src/pages/releases.html
@@ -61,6 +63,7 @@ def shell(title, body, root, section="", wide=False, desc=""):
     <a class="brand" href="{root}index.html">ktm</a>
     <nav class="main">
       {nav("language/index.html", "Language", "language")}
+      {nav("guides/index.html", "Quick Guides", "guides")}
       {nav("std/index.html", "Library", "std")}
       {nav("releases.html", "Releases", "releases")}
     </nav>
@@ -96,16 +99,16 @@ def write(rel, text):
     open(path, "w").write(text)
 
 
-def chapters():
+def chapters(section="language"):
     """[(file stem, title, lede, html, toc)] in order"""
     out = []
-    for path in sorted(glob.glob(os.path.join(SRC, "language", "[0-9][0-9]-*.md"))):
+    for path in sorted(glob.glob(os.path.join(SRC, section, "[0-9][0-9]-*.md"))):
         title, lede, body, toc, _ = md.convert(open(path).read())
         out.append((os.path.basename(path)[:-3], title, lede, body, toc))
     return out
 
 
-def chapter_pages(chs, index):
+def chapter_pages(chs, index, section="language", label="Language"):
     side = "".join(
         f'<li><a href="{stem}.html"{{on{stem}}}><span class="num">{stem[:2].lstrip("0")}</span>{html.escape(title)}</a></li>'
         for stem, title, _, _, _ in chs)
@@ -122,17 +125,18 @@ def chapter_pages(chs, index):
             q = chs[n + 1]
             next_link = f'<a class="next" href="{q[0]}.html"><span>Next</span>{html.escape(q[1])}</a>'
         page = f"""<div class="doc">
-  <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol>{nav}</ol></aside>
+  <aside class="chapters" aria-label="Chapters"><h4>{label}</h4><ol>{nav}</ol></aside>
   <article class="prose">
 {body}
     <nav class="pager">{prev_link}{next_link}</nav>
   </article>
   <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul>{on_page}</ul></aside>
 </div>"""
-        write(f"language/{stem}.html", shell(title, page, "../", "language", wide=True, desc=lede))
+        write(f"{section}/{stem}.html", shell(title, page, "../", section, wide=True, desc=lede))
         for sid, text in toc:
-            index.append({"t": text, "p": title, "u": f"language/{stem}.html#{sid}", "k": "section"})
-        index.append({"t": title, "p": "Language", "u": f"language/{stem}.html", "k": "chapter"})
+            index.append({"t": text, "p": title, "u": f"{section}/{stem}.html#{sid}", "k": "section"})
+        index.append({"t": title, "p": label, "u": f"{section}/{stem}.html",
+                      "k": "chapter" if section == "language" else "guide"})
 
 
 def language_index(chs):
@@ -148,6 +152,21 @@ def language_index(chs):
 </main>"""
     write("language/index.html", shell("Language", body, "../", "language",
                                        desc="The ktm language, one topic per chapter."))
+
+
+def guides_index(gs):
+    items = "".join(
+        f'<li><a href="{stem}.html"><span class="num">{stem[:2].lstrip("0")}</span>'
+        f'<b>{html.escape(title)}</b><span class="desc">{html.escape(lede)}</span></a></li>'
+        for stem, title, lede, _, _ in gs)
+    body = f"""<main class="narrow">
+  <h1>Quick Guides</h1>
+  <p class="lede">One task each, from an empty directory to a program that works, with every file
+  shown whole. Each guide stands on its own.</p>
+  <ol class="toc">{items}</ol>
+</main>"""
+    write("guides/index.html", shell("Quick Guides", body, "../", "guides",
+                                     desc="Quick guides: one task each, from start to a working program."))
 
 
 def std_pages(index):
@@ -228,6 +247,9 @@ def main():
     chs = chapters()
     chapter_pages(chs, index)
     language_index(chs)
+    gs = chapters("guides")
+    chapter_pages(gs, index, "guides", "Quick Guides")
+    guides_index(gs)
     n = std_pages(index)
     home = open(os.path.join(SRC, "pages", "index.html")).read().replace("{VERSION}", VERSION)
     write("index.html", shell("ktm", home, "", "", desc="ktm, a compiled systems language for servers and tools."))
@@ -235,7 +257,7 @@ def main():
     page_from("known-issues.html", "Known issues", "", "The bugs ktm has today, and how to work around them.")
     page_from("roadmap.html", "Roadmap", "", "What ktm's standard library and packages have, and what comes next.")
     write("assets/search.js", "window.KTM_SEARCH = " + json.dumps(index, separators=(",", ":")) + ";\n")
-    print(f"wrote {OUT}: {len(chs)} chapters, {n} library declarations, {len(index)} search entries")
+    print(f"wrote {OUT}: {len(chs)} chapters, {len(gs)} guides, {n} library declarations, {len(index)} search entries")
     broken = broken_links()
     for page, href in broken:
         print(f"broken link: {page} -> {href}")
