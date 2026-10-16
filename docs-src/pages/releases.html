@@ -3,6 +3,17 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.28.2 <small>(2026-10-16)</small></h2>
+<p>A prompt of several lines for <code>term.readLine</code>.</p>
+
+<h3>Fixes</h3>
+<ul>
+  <li><code>term.readLine</code> with a prompt that holds a newline (<code>"[bold]app>[/]\n"</code>)
+  wrote the prompt again at every key, so the screen filled with prompts and the cursor drifted. The
+  lines before the prompt's last are written once now, and only the last is redrawn with what is
+  typed.</li>
+</ul>
+
 <h2>v0.28.1 <small>(2026-10-16)</small></h2>
 <p>Two fixes found by a program built on <code>term.readLine</code>.</p>
 
