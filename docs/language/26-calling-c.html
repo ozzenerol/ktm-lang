@@ -7,7 +7,12 @@
 <meta name="description" content="ktm calls C functions directly: declare one with extern &amp;quot;c&amp;quot; and call it, with no wrapper and no cost beyond a normal call. Most of the C library is already declared in the libc module. This chapter covers the libc module, declaring C functions and data, how C types are written in ktm, C structs, passing ktm functions to C as callbacks, linking other C libraries, and how ktm&#x27;s names stay apart from C&#x27;s.">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="../assets/style.css">
-<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script>try {
+  var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t;
+  ["chapters", "onpage", "std-left", "std-right"].forEach(function (s) {
+    if (localStorage.getItem("ktm-side-" + s) === "closed") document.documentElement.classList.add("closed-" + s);
+  });
+} catch (e) {}</script>
 </head>
 <body class="wide">
 <header class="top">
@@ -29,6 +34,7 @@
   </div>
 </header>
 <div class="doc">
+  <button class="side-toggle" type="button" data-side="chapters" data-text="Language" data-label="the chapter list" aria-expanded="true">&#8249; Language</button>
   <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-scoped.html"><span class="num">16</span>defer and scoped</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li><li><a href="23-attributes.html"><span class="num">23</span>Attributes</a></li><li><a href="24-reflection.html"><span class="num">24</span>Reflection</a></li><li><a href="25-preprocessor.html"><span class="num">25</span>The preprocessor</a></li><li><a href="26-calling-c.html" class="on"><span class="num">26</span>Calling C</a></li><li><a href="27-threads-and-threadlocal.html"><span class="num">27</span>Threads and threadlocal</a></li><li><a href="28-inline-assembly.html"><span class="num">28</span>Inline assembly</a></li><li><a href="29-safety-and-debugging.html"><span class="num">29</span>Safety and debugging</a></li></ol></aside>
   <article class="prose">
 <h1>Calling C</h1>
@@ -215,6 +221,7 @@ done</code></pre>
 <ul><li><code>extern &quot;c&quot; T name(params);</code> declares a C function; <code>extern &quot;c&quot; T name;</code> a C global; <code>_extern SYMBOL declaration</code> binds a declaration to an exact symbol.</li><li>The prototype must match C's; ktm doesn't check it against C.</li><li>C structs are declared with the same fields in the same order.</li><li>ktm functions use C's calling convention and can be C callbacks.</li><li><code>libc</code> is always linked; other libraries come with <code>#link</code> or <code>-clibs</code>.</li><li>ktm's names never clash with C's symbols.</li></ul>
     <nav class="pager"><a class="prev" href="25-preprocessor.html"><span>Previous</span>The preprocessor</a><a class="next" href="27-threads-and-threadlocal.html"><span>Next</span>Threads and threadlocal</a></nav>
   </article>
+  <button class="side-toggle side-toggle-r" type="button" data-side="onpage" data-text="On this page" data-label="on this page" aria-expanded="true">On this page &#8250;</button>
   <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#the-libc-module">The libc module</a></li><li><a href="#declaring-a-c-function">Declaring a C function</a></li><li><a href="#c-types-in-ktm">C types in ktm</a></li><li><a href="#c-data">C data</a></li><li><a href="#c-structs">C structs</a></li><li><a href="#callbacks-into-ktm">Callbacks into ktm</a></li><li><a href="#other-c-libraries">Other C libraries</a></li><li><a href="#names-stay-apart">Names stay apart</a></li><li><a href="#rules">Rules</a></li></ul></aside>
 </div>
 <footer>

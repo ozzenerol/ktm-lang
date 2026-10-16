@@ -7,7 +7,12 @@
 <meta name="description" content="Write what a program does to stderr, to stdout or to a file, with the standard library&#x27;s log module. This guide starts with one line and adds a step at a time: levels, a level from the environment, a log file, where each line came from, rotation, a second log of your own, threads, and the access log of an HTTP server. Every step is a whole program you can build and run.">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="../assets/style.css">
-<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script>try {
+  var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t;
+  ["chapters", "onpage", "std-left", "std-right"].forEach(function (s) {
+    if (localStorage.getItem("ktm-side-" + s) === "closed") document.documentElement.classList.add("closed-" + s);
+  });
+} catch (e) {}</script>
 </head>
 <body class="wide">
 <header class="top">
@@ -29,6 +34,7 @@
   </div>
 </header>
 <div class="doc">
+  <button class="side-toggle" type="button" data-side="chapters" data-text="Quick Guides" data-label="the chapter list" aria-expanded="true">&#8249; Quick Guides</button>
   <aside class="chapters" aria-label="Chapters"><h4>Quick Guides</h4><ol><li><a href="01-database-migrations.html"><span class="num">1</span>Database migrations</a></li><li><a href="02-logging.html" class="on"><span class="num">2</span>Logging</a></li><li><a href="03-sqlite.html"><span class="num">3</span>SQLite</a></li><li><a href="04-postgresql.html"><span class="num">4</span>PostgreSQL</a></li><li><a href="05-flags.html"><span class="num">5</span>Command-line flags</a></li><li><a href="06-terminal-output.html"><span class="num">6</span>Terminal output</a></li></ol></aside>
   <article class="prose">
 <h1>Logging</h1>
@@ -376,6 +382,7 @@ curl localhost:8080/nope</code></pre>
 <ul><li>**Set the log up first thing in <code>main</code>, and defer <code>log.shutdown()</code> right after.** Lines logged before the set-up go to stderr.</li><li><strong>Log events, not every step.</strong> One <code>info</code> line per thing that happened (a request served, a job finished) reads well. Put the steps in between at <code>debug</code>.</li><li>**Put values in the message as <code>key=value</code>** (<code>transfer from=ann cents=2500</code>). Then <code>grep</code> finds them, and a log tool can split them into fields.</li><li><strong>Never log secrets.</strong> Passwords, tokens, keys and full card numbers stay out of the message.</li><li>**<code>error</code> means someone should look.** If nobody has to act, it is a <code>warn</code>.</li><li>**Set <code>threadSafe</code> whenever more than one thread logs**, which includes every <code>net.http</code> server.</li></ul>
     <nav class="pager"><a class="prev" href="01-database-migrations.html"><span>Previous</span>Database migrations</a><a class="next" href="03-sqlite.html"><span>Next</span>SQLite</a></nav>
   </article>
+  <button class="side-toggle side-toggle-r" type="button" data-side="onpage" data-text="On this page" data-label="on this page" aria-expanded="true">On this page &#8250;</button>
   <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#what-you-need">What you need</a></li><li><a href="#the-first-lines">The first lines</a></li><li><a href="#levels">Levels</a></li><li><a href="#logging-to-a-file">Logging to a file</a></li><li><a href="#stdout-for-containers">Stdout, for containers</a></li><li><a href="#shutting-down">Shutting down</a></li><li><a href="#when-the-file-can-t-be-opened">When the file can&#x27;t be opened</a></li><li><a href="#rotation">Rotation</a></li><li><a href="#a-logger-of-your-own">A logger of your own</a></li><li><a href="#threads">Threads</a></li><li><a href="#an-http-server-s-access-log">An HTTP server&#x27;s access log</a></li><li><a href="#reference">Reference</a></li><li><a href="#rules-of-thumb">Rules of thumb</a></li></ul></aside>
 </div>
 <footer>

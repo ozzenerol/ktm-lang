@@ -57,7 +57,12 @@ def shell(title, body, root, section="", wide=False, desc=""):
 {meta}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="{root}assets/style.css">
-<script>try {{ var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; }} catch (e) {{}}</script>
+<script>try {{
+  var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t;
+  ["chapters", "onpage", "std-left", "std-right"].forEach(function (s) {{
+    if (localStorage.getItem("ktm-side-" + s) === "closed") document.documentElement.classList.add("closed-" + s);
+  }});
+}} catch (e) {{}}</script>
 </head>
 <body{' class="wide"' if wide else ''}>
 <header class="top">
@@ -127,11 +132,13 @@ def chapter_pages(chs, index, section="language", label="Language"):
             q = chs[n + 1]
             next_link = f'<a class="next" href="{q[0]}.html"><span>Next</span>{html.escape(q[1])}</a>'
         page = f"""<div class="doc">
+  <button class="side-toggle" type="button" data-side="chapters" data-text="{html.escape(label)}" data-label="the chapter list" aria-expanded="true">&#8249; {html.escape(label)}</button>
   <aside class="chapters" aria-label="Chapters"><h4>{label}</h4><ol>{nav}</ol></aside>
   <article class="prose">
 {body}
     <nav class="pager">{prev_link}{next_link}</nav>
   </article>
+  <button class="side-toggle side-toggle-r" type="button" data-side="onpage" data-text="On this page" data-label="on this page" aria-expanded="true">On this page &#8250;</button>
   <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul>{on_page}</ul></aside>
 </div>"""
         write(f"{section}/{stem}.html", shell(title, page, "../", section, wide=True, desc=lede))
@@ -186,12 +193,14 @@ def std_pages(index):
             "source": "https://github.com/ozzenerol/ktm-lang/blob/main/src/std/"}
     write("std/data.js", "window.KTM_STD = " + json.dumps(data, separators=(",", ":")) + ";\n")
     body = """<div class="std" id="std">
+  <button class="side-toggle" type="button" data-side="std-left" data-text="Modules" data-label="modules" aria-expanded="true">&#8249; Modules</button>
   <aside class="std-left" aria-label="Modules">
     <input id="std-filter" type="search" placeholder="Find a function, type or module" aria-label="Find in the library" autocomplete="off">
     <nav id="std-modules"></nav>
     <ul id="std-found" class="std-found" hidden></ul>
   </aside>
   <main id="std-main" class="std-main"></main>
+  <button class="side-toggle side-toggle-r" type="button" data-side="std-right" data-text="Names" data-label="this module's names" aria-expanded="true">Names &#8250;</button>
   <aside id="std-right" class="std-right" aria-label="In this module"></aside>
 </div>
 <script src="data.js"></script>
