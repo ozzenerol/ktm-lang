@@ -3,6 +3,39 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.27.0 <small>(2026-10-16)</small></h2>
+<p>A new standard library module for the output of command-line programs, and two Quick Guides.</p>
+
+<h3>term: terminal output</h3>
+<ul>
+  <li><code>term.print(fmt, ...)</code> is <code>printf</code> with colors written as markup:
+  <code>"[green]passed[/] %d tests, [bold red]%d failed[/]"</code>. Colors, backgrounds
+  (<code>[white on blue]</code>) and styles (<code>bold</code>, <code>dim</code>, <code>italic</code>,
+  <code>underline</code>, <code>reverse</code>, <code>strike</code>); <code>[/]</code> closes the last tag.
+  The values filled in by <code>%s</code> are never read as markup. <code>term.eprint</code> writes to
+  stderr, <code>term.format</code> into a <code>String</code>.</li>
+  <li><code>term.success</code>, <code>term.info</code>, <code>term.warn</code> and <code>term.error</code>
+  write one line after a green <code>✓</code>, a blue <code>•</code>, a yellow <code>!</code> or a red
+  <code>✗</code> (warnings and errors to stderr); <code>term.title</code> a bold line.</li>
+  <li>Colors are on for a terminal and off for a pipe or a file, with <code>NO_COLOR</code> set or
+  <code>TERM=dumb</code>; <code>FORCE_COLOR</code> and <code>term.setColors</code> turn them on. Without
+  colors the markup is removed and the text stays.</li>
+  <li><code>term.table(headers...)</code> and <code>t.row(cells...)</code>: cells of any type (text,
+  numbers, bools, enums, <code>String</code>s) in lined-up columns, numbers on the right, markup that
+  doesn't count in the width. <code>t.align</code>, <code>t.border</code> (<code>box</code> lines or a
+  <code>markdown</code> table) and <code>t.format()</code> for the table as a <code>String</code>.</li>
+  <li><code>term.progress(label, total)</code>: a progress bar on stderr, redrawn in place on a terminal,
+  with the time taken at <code>p.done()</code>. Lines written with <code>term</code> while it runs go
+  above it; in a pipe only the last line is written.</li>
+</ul>
+
+<h3>Documentation</h3>
+<ul>
+  <li>Two new <a href="guides/index.html">Quick Guides</a>:
+  <a href="guides/05-flags.html">Command-line flags</a> with the <code>flag</code> module, and
+  <a href="guides/06-terminal-output.html">Terminal output</a> with <code>term</code>.</li>
+</ul>
+
 <h2>v0.26.0 <small>(2026-10-16)</small></h2>
 <p>SQLite with arguments and structs, go-to-definition into packages, man pages, and Quick Guides.</p>
 
