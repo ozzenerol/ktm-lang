@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Command-line flags - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html">Language</a>
+      <a href="../guides/index.html" class="on">Quick Guides</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.26.0</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Quick Guides</h4><ol><li><a href="01-database-migrations.html"><span class="num">1</span>Database migrations</a></li><li><a href="02-logging.html"><span class="num">2</span>Logging</a></li><li><a href="03-sqlite.html"><span class="num">3</span>SQLite</a></li><li><a href="04-postgresql.html"><span class="num">4</span>PostgreSQL</a></li><li><a href="05-flags.html" class="on"><span class="num">5</span>Command-line flags</a></li></ol></aside>
+  <article class="prose">
+<h1>Command-line flags</h1>
+<p>Read flags like <code>--port 9000</code> and <code>-v</code> from the command line with the standard library's <code>flag</code> module. This guide builds one program, <code>serve</code>, a step at a time: one flag, then the four kinds of flag and their short names, the ways to write them, the arguments that aren't flags, checking values, a fallback to an environment variable and your own error messages. The last section builds a second program with subcommands, like <code>git commit</code>. Every step is a whole program you can build and run.</p>
+<h2 id="what-you-need"><a href="#what-you-need">What you need</a></h2>
+<p>Any ktm. <code>flag</code> is part of the standard library, so there is nothing to fetch. Every <code>serve</code> program in this guide is one file, <code>serve.ktm</code>, built like this:</p>
+<pre class="code"><code>ktm serve.ktm -o serve</code></pre>
+<p>The programs print the settings they were given instead of serving anything, so the guide stays about flags.</p>
+<h2 id="the-first-flag"><a href="#the-first-flag">The first flag</a></h2>
+<pre class="code"><code><span class="k">import</span> flag;
+
+<span class="t">i32</span> main(<span class="t">i32</span> argc, <span class="t">u8</span> **argv) {
+    flag.Set *fs = flag.new(<span class="s">&quot;serve&quot;</span>, <span class="s">&quot;serves the files of a directory over HTTP&quot;</span>);
+    <span class="t">i64</span> *port = fs.integer(<span class="s">&quot;port&quot;</span>, <span class="n">8080</span>, <span class="s">&quot;the port to listen on&quot;</span>);
+    fs.parseOrExit(argc, argv);
+
+    printf(<span class="s">&quot;listening on port %d\n&quot;</span>, *port);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm serve.ktm -o serve
+./serve
+./serve --port 9000</code></pre>
+<pre class="out"><code>listening on port 8080
+listening on port 9000</code></pre>
+<ul><li><code>flag.new</code> makes a <code>flag.Set</code>: the program's name, used in the help, and one line about what it does.</li><li><code>fs.integer</code> defines <code>--port</code>: its name without dashes, its default, and a line for the help. It returns a pointer to the value. Read it after parsing, as <code>*port</code>.</li><li><code>fs.parseOrExit</code> reads <code>argv</code>. When the command line is right it returns, and <code>*port</code> holds the value given, or the default when <code>--port</code> wasn't there.</li><li><code>main</code> takes <code>argc</code> and <code>argv</code> to have a command line to pass on.</li></ul>
+<p>Every program gets <code>-h</code> and <code>--help</code> without defining them. <code>parseOrExit</code> prints the help to stdout and ends the program with exit code 0:</p>
+<pre class="code"><code>./serve -h</code></pre>
+<pre class="out"><code>usage: serve [flags] [arguments]
+
+serves the files of a directory over HTTP
+
+flags:
+      --port int  the port to listen on (default 8080)
+  -h, --help      show this help</code></pre>
+<p>A mistake ends it too, with what is wrong and the help on stderr, and exit code 2:</p>
+<pre class="code"><code>./serve --port eighty
+echo $?</code></pre>
+<pre class="out"><code>serve: --port: `eighty` isn&#x27;t a whole number
+
+usage: serve [flags] [arguments]
+
+serves the files of a directory over HTTP
+
+flags:
+      --port int  the port to listen on (default 8080)
+  -h, --help      show this help
+2</code></pre>
+<h2 id="four-kinds-of-flag"><a href="#four-kinds-of-flag">Four kinds of flag</a></h2>
+<p>A flag holds a whole number, a number with a fraction, text, or on/off. Each kind has its own call, and each takes a one-letter short name as its last argument:</p>
+<pre class="code"><code><span class="k">import</span> flag;
+
+<span class="t">i32</span> main(<span class="t">i32</span> argc, <span class="t">u8</span> **argv) {
+    flag.Set *fs = flag.new(<span class="s">&quot;serve&quot;</span>, <span class="s">&quot;serves the files of a directory over HTTP&quot;</span>);
+    <span class="t">i64</span> *port = fs.integer(<span class="s">&quot;port&quot;</span>, <span class="n">8080</span>, <span class="s">&quot;the port to listen on&quot;</span>, <span class="s">&#x27;p&#x27;</span>);
+    <span class="t">u8</span>[] *host = fs.string(<span class="s">&quot;host&quot;</span>, <span class="s">&quot;127.0.0.1&quot;</span>, <span class="s">&quot;the address to listen on&quot;</span>);
+    <span class="t">f64</span> *timeout = fs.number(<span class="s">&quot;timeout&quot;</span>, <span class="n">30</span>, <span class="s">&quot;seconds to wait for a slow client&quot;</span>, <span class="s">&#x27;t&#x27;</span>);
+    <span class="t">bool</span> *verbose = fs.boolean(<span class="s">&quot;verbose&quot;</span>, <span class="k">false</span>, <span class="s">&quot;log every request&quot;</span>, <span class="s">&#x27;v&#x27;</span>);
+    fs.parseOrExit(argc, argv);
+
+    printf(<span class="s">&quot;listening on %.*s:%d\n&quot;</span>, host.len, host.ptr, *port);
+    printf(<span class="s">&quot;timeout %gs, verbose %s\n&quot;</span>, *timeout, *verbose ? <span class="s">&quot;on&quot;</span> : <span class="s">&quot;off&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm serve.ktm -o serve
+./serve
+./serve -p 9000 --host 0.0.0.0 -t 2.5 -v</code></pre>
+<pre class="out"><code>listening on 127.0.0.1:8080
+timeout 30s, verbose off
+listening on 0.0.0.0:9000
+timeout 2.5s, verbose on</code></pre>
+<p>The help lists every flag, with its short name, its kind and its default:</p>
+<pre class="code"><code>./serve -h</code></pre>
+<pre class="out"><code>usage: serve [flags] [arguments]
+
+serves the files of a directory over HTTP
+
+flags:
+  -p, --port int        the port to listen on (default 8080)
+      --host text       the address to listen on (default &quot;127.0.0.1&quot;)
+  -t, --timeout number  seconds to wait for a slow client (default 30)
+  -v, --verbose         log every request
+  -h, --help            show this help</code></pre>
+<div class="table"><table><thead><tr><th>Call</th><th>Returns</th><th>The value given must be</th></tr></thead><tbody><tr><td><code>fs.integer(name, def, usage, short)</code></td><td><code>i64 *</code></td><td>a whole number: <code>9000</code>, <code>-5</code></td></tr><tr><td><code>fs.number(name, def, usage, short)</code></td><td><code>f64 *</code></td><td>a number: <code>2.5</code>, <code>30</code>, <code>1e3</code></td></tr><tr><td><code>fs.string(name, def, usage, short)</code></td><td><code>u8[] *</code></td><td>anything</td></tr><tr><td><code>fs.boolean(name, def, usage, short)</code></td><td><code>bool *</code></td><td>nothing: the flag alone turns it on</td></tr></tbody></table></div>
+<ul><li>The short name is optional: <code>--host</code> has none, so it is only <code>--host</code>.</li><li><code>host.len</code> and <code>host.ptr</code> reach through the pointer, like the fields of a struct pointer.</li><li>The text a string flag holds points into <code>argv</code>, or is the default. There is nothing to free.</li><li>The pointers stay valid as long as the Set, which is the whole program here.</li><li>A flag defined twice, or a name that starts with a dash, throws when the program starts: a mistake in the program, not on the command line.</li></ul>
+<h2 id="ways-to-write-a-flag"><a href="#ways-to-write-a-flag">Ways to write a flag</a></h2>
+<p>The same program understands the forms of Go's <code>flag</code> package and of GNU tools, so people can type what they are used to:</p>
+<pre class="code"><code>./serve --port=9000 --host=0.0.0.0
+./serve -p9000 -t0.5
+./serve -port 9000 -verbose
+./serve -v --verbose=false</code></pre>
+<pre class="out"><code>listening on 0.0.0.0:9000
+timeout 30s, verbose off
+listening on 127.0.0.1:9000
+timeout 0.5s, verbose off
+listening on 127.0.0.1:9000
+timeout 30s, verbose on
+listening on 127.0.0.1:8080
+timeout 30s, verbose off</code></pre>
+<div class="table"><table><thead><tr><th>Form</th><th>Example</th></tr></thead><tbody><tr><td><code>--name value</code></td><td><code>--port 9000</code></td></tr><tr><td><code>--name=value</code></td><td><code>--port=9000</code></td></tr><tr><td><code>-name value</code>, <code>-name=value</code> (Go's)</td><td><code>-port 9000</code></td></tr><tr><td><code>-s value</code></td><td><code>-p 9000</code></td></tr><tr><td><code>-svalue</code></td><td><code>-p9000</code></td></tr><tr><td><code>--name</code>, <code>-s</code> for an on/off flag</td><td><code>--verbose</code>, <code>-v</code></td></tr><tr><td><code>--name=false</code> to turn one off</td><td><code>--verbose=false</code></td></tr><tr><td><code>-abc</code> for several on/off flags</td><td><code>-vq</code> for <code>-v -q</code></td></tr></tbody></table></div>
+<ul><li>An on/off flag takes <code>true</code>, <code>false</code>, <code>1</code>, <code>0</code>, <code>yes</code> or <code>no</code> after an <code>=</code>. Without the <code>=</code> it takes nothing: <code>--verbose false</code> turns it on and leaves <code>false</code> as an argument.</li><li>A flag given twice keeps the last value: <code>-v --verbose=false</code> is off.</li><li>Only on/off flags group: <code>-vp 9000</code> is a mistake. Write <code>-v -p 9000</code>.</li><li>A value can start with a dash: <code>--port -5</code> gives <code>-5</code>, which the next section's checks turn away.</li></ul>
+<h2 id="arguments-that-aren-t-flags"><a href="#arguments-that-aren-t-flags">Arguments that aren't flags</a></h2>
+<p>Whatever on the command line isn't a flag or a flag's value is an argument. <code>fs.nargs()</code> says how many there are, and <code>fs.arg(i)</code> gives each one. Here they are the directories to serve, and <code>.</code> when there are none:</p>
+<pre class="code"><code><span class="k">import</span> flag;
+
+<span class="t">i32</span> main(<span class="t">i32</span> argc, <span class="t">u8</span> **argv) {
+    flag.Set *fs = flag.new(<span class="s">&quot;serve&quot;</span>, <span class="s">&quot;serves the files of a directory over HTTP&quot;</span>);
+    <span class="t">i64</span> *port = fs.integer(<span class="s">&quot;port&quot;</span>, <span class="n">8080</span>, <span class="s">&quot;the port to listen on&quot;</span>, <span class="s">&#x27;p&#x27;</span>);
+    <span class="t">u8</span>[] *host = fs.string(<span class="s">&quot;host&quot;</span>, <span class="s">&quot;127.0.0.1&quot;</span>, <span class="s">&quot;the address to listen on&quot;</span>);
+    <span class="t">f64</span> *timeout = fs.number(<span class="s">&quot;timeout&quot;</span>, <span class="n">30</span>, <span class="s">&quot;seconds to wait for a slow client&quot;</span>, <span class="s">&#x27;t&#x27;</span>);
+    <span class="t">bool</span> *verbose = fs.boolean(<span class="s">&quot;verbose&quot;</span>, <span class="k">false</span>, <span class="s">&quot;log every request&quot;</span>, <span class="s">&#x27;v&#x27;</span>);
+    fs.parseOrExit(argc, argv);
+
+    printf(<span class="s">&quot;listening on %.*s:%d\n&quot;</span>, host.len, host.ptr, *port);
+    printf(<span class="s">&quot;timeout %gs, verbose %s\n&quot;</span>, *timeout, *verbose ? <span class="s">&quot;on&quot;</span> : <span class="s">&quot;off&quot;</span>);
+    <span class="k">if</span> (fs.nargs() == <span class="n">0</span>) {
+        printf(<span class="s">&quot;serving .\n&quot;</span>);
+    }
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; fs.nargs(); i++) {
+        <span class="t">u8</span>[] dir = fs.arg(i);
+        printf(<span class="s">&quot;serving %.*s\n&quot;</span>, dir.len, dir.ptr);
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm serve.ktm -o serve
+./serve public --port 9000 assets</code></pre>
+<pre class="out"><code>listening on 127.0.0.1:9000
+timeout 30s, verbose off
+serving public
+serving assets</code></pre>
+<p>Flags and arguments can come in any order. <code>--</code> ends the flags: everything after it is an argument, even when it starts with a dash:</p>
+<pre class="code"><code>./serve -- -drafts</code></pre>
+<pre class="out"><code>listening on 127.0.0.1:8080
+timeout 30s, verbose off
+serving -drafts</code></pre>
+<ul><li><code>fs.arg(i)</code> past the end gives <code>&quot;&quot;</code>, so <code>fs.arg(0)</code> is safe to read when an argument is optional.</li><li>A lone <code>-</code> is an argument, the usual name for stdin.</li></ul>
+<h2 id="checking-values-and-port"><a href="#checking-values-and-port">Checking values and $PORT</a></h2>
+<p><code>flag</code> checks that a value has the right kind, not that it makes sense: <code>--port 70000</code> is a whole number. Check the values after parsing and stop with a message when one is wrong.</p>
+<p><code>fs.given(&quot;port&quot;)</code> says whether <code>--port</code> (or <code>-p</code>) was on the command line. It tells a default apart from the same value typed by hand, which is what a fallback needs. Here <code>--port</code> wins over the <code>PORT</code> environment variable, and <code>PORT</code> over the default:</p>
+<pre class="code"><code><span class="k">import</span> cstr, flag, libc, os, proc, str;
+
+<span class="c">/* Says what is wrong on stderr and ends the program with exit code 2, the
+ * code parseOrExit uses for a mistake */</span>
+<span class="t">void</span> usageError(<span class="t">u8</span> *fmt, ...args) {
+    <span class="t">u8</span> *message = cstr.formatArgs(<span class="k">null</span>, fmt, args);
+    libc.fprintf(libc.stderr, <span class="s">&quot;serve: %s\nrun `serve -h` for help\n&quot;</span>, message);
+    os.exit(<span class="n">2</span>);
+}
+
+<span class="t">i32</span> main(<span class="t">i32</span> argc, <span class="t">u8</span> **argv) {
+    flag.Set *fs = flag.new(<span class="s">&quot;serve&quot;</span>, <span class="s">&quot;serves the files of a directory over HTTP&quot;</span>);
+    <span class="t">i64</span> *port = fs.integer(<span class="s">&quot;port&quot;</span>, <span class="n">8080</span>, <span class="s">&quot;the port to listen on, or $PORT&quot;</span>, <span class="s">&#x27;p&#x27;</span>);
+    <span class="t">u8</span>[] *host = fs.string(<span class="s">&quot;host&quot;</span>, <span class="s">&quot;127.0.0.1&quot;</span>, <span class="s">&quot;the address to listen on&quot;</span>);
+    <span class="t">f64</span> *timeout = fs.number(<span class="s">&quot;timeout&quot;</span>, <span class="n">30</span>, <span class="s">&quot;seconds to wait for a slow client&quot;</span>, <span class="s">&#x27;t&#x27;</span>);
+    <span class="t">bool</span> *verbose = fs.boolean(<span class="s">&quot;verbose&quot;</span>, <span class="k">false</span>, <span class="s">&quot;log every request&quot;</span>, <span class="s">&#x27;v&#x27;</span>);
+    fs.parseOrExit(argc, argv);
+
+    <span class="c">/* --port wins over $PORT, and $PORT over the default */</span>
+    <span class="k">scoped</span> <span class="t">String</span> env = proc.getenv(<span class="s">&quot;PORT&quot;</span>);
+    <span class="k">if</span> (!fs.given(<span class="s">&quot;port&quot;</span>) &amp;&amp; env.len) {
+        <span class="k">if</span> (!str.toInt(env[<span class="n">0</span>:], port)) {
+            usageError(<span class="s">&quot;$PORT: `%.*s` isn&#x27;t a whole number&quot;</span>, env.len, env.ptr);
+        }
+    }
+    <span class="k">if</span> (*port &lt; <span class="n">1</span> || *port &gt; <span class="n">65535</span>) {
+        usageError(<span class="s">&quot;the port must be between 1 and 65535, not %d&quot;</span>, *port);
+    }
+    <span class="k">if</span> (*timeout &lt;= <span class="n">0</span>) {
+        usageError(<span class="s">&quot;--timeout must be more than 0 seconds&quot;</span>);
+    }
+
+    printf(<span class="s">&quot;listening on %.*s:%d\n&quot;</span>, host.len, host.ptr, *port);
+    printf(<span class="s">&quot;timeout %gs, verbose %s\n&quot;</span>, *timeout, *verbose ? <span class="s">&quot;on&quot;</span> : <span class="s">&quot;off&quot;</span>);
+    <span class="k">if</span> (fs.nargs() == <span class="n">0</span>) {
+        printf(<span class="s">&quot;serving .\n&quot;</span>);
+    }
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; fs.nargs(); i++) {
+        <span class="t">u8</span>[] dir = fs.arg(i);
+        printf(<span class="s">&quot;serving %.*s\n&quot;</span>, dir.len, dir.ptr);
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm serve.ktm -o serve
+PORT=3000 ./serve
+PORT=3000 ./serve -p 9000</code></pre>
+<pre class="out"><code>listening on 127.0.0.1:3000
+timeout 30s, verbose off
+serving .
+listening on 127.0.0.1:9000
+timeout 30s, verbose off
+serving .</code></pre>
+<pre class="code"><code>./serve -p 70000
+echo $?
+PORT=abc ./serve
+./serve -t 0</code></pre>
+<pre class="out"><code>serve: the port must be between 1 and 65535, not 70000
+run `serve -h` for help
+2
+serve: $PORT: `abc` isn&#x27;t a whole number
+run `serve -h` for help
+serve: --timeout must be more than 0 seconds
+run `serve -h` for help</code></pre>
+<ul><li><code>str.toInt</code> writes the number straight into the flag's value, through the same pointer.</li><li>The help says where else the value can come from (<code>or $PORT</code>). It is the only place a user will look.</li><li>The checks run after <code>parseOrExit</code>, so <code>-h</code> still prints the help when <code>PORT</code> is wrong.</li></ul>
+<h2 id="your-own-error-messages"><a href="#your-own-error-messages">Your own error messages</a></h2>
+<p><code>parseOrExit</code> prints the whole help for every mistake. The checks above print one line and point to <code>-h</code> instead. To make the flag mistakes look the same, call <code>fs.parse</code>, which returns <code>false</code> instead of ending the program, and decide what to do:</p>
+<pre class="code"><code><span class="k">import</span> cstr, flag, libc, os, proc, str;
+
+<span class="c">/* Says what is wrong on stderr and ends the program with exit code 2, the
+ * code for a mistake */</span>
+<span class="t">void</span> usageError(<span class="t">u8</span> *fmt, ...args) {
+    <span class="t">u8</span> *message = cstr.formatArgs(<span class="k">null</span>, fmt, args);
+    libc.fprintf(libc.stderr, <span class="s">&quot;serve: %s\nrun `serve -h` for help\n&quot;</span>, message);
+    os.exit(<span class="n">2</span>);
+}
+
+<span class="t">i32</span> main(<span class="t">i32</span> argc, <span class="t">u8</span> **argv) {
+    flag.Set *fs = flag.new(<span class="s">&quot;serve&quot;</span>, <span class="s">&quot;serves the files of a directory over HTTP&quot;</span>);
+    <span class="t">i64</span> *port = fs.integer(<span class="s">&quot;port&quot;</span>, <span class="n">8080</span>, <span class="s">&quot;the port to listen on, or $PORT&quot;</span>, <span class="s">&#x27;p&#x27;</span>);
+    <span class="t">u8</span>[] *host = fs.string(<span class="s">&quot;host&quot;</span>, <span class="s">&quot;127.0.0.1&quot;</span>, <span class="s">&quot;the address to listen on&quot;</span>);
+    <span class="t">f64</span> *timeout = fs.number(<span class="s">&quot;timeout&quot;</span>, <span class="n">30</span>, <span class="s">&quot;seconds to wait for a slow client&quot;</span>, <span class="s">&#x27;t&#x27;</span>);
+    <span class="t">bool</span> *verbose = fs.boolean(<span class="s">&quot;verbose&quot;</span>, <span class="k">false</span>, <span class="s">&quot;log every request&quot;</span>, <span class="s">&#x27;v&#x27;</span>);
+    <span class="k">if</span> (!fs.parse(argc, argv)) {
+        <span class="k">if</span> (fs.helpAsked()) {
+            <span class="t">String</span> help = fs.usage();
+            printf(<span class="s">&quot;%.*s&quot;</span>, help.len, help.ptr);
+            help.free();
+            <span class="k">return</span> <span class="n">0</span>;
+        }
+        <span class="t">u8</span>[] why = fs.error();
+        usageError(<span class="s">&quot;%.*s&quot;</span>, why.len, why.ptr);
+    }
+
+    <span class="c">/* --port wins over $PORT, and $PORT over the default */</span>
+    <span class="k">scoped</span> <span class="t">String</span> env = proc.getenv(<span class="s">&quot;PORT&quot;</span>);
+    <span class="k">if</span> (!fs.given(<span class="s">&quot;port&quot;</span>) &amp;&amp; env.len) {
+        <span class="k">if</span> (!str.toInt(env[<span class="n">0</span>:], port)) {
+            usageError(<span class="s">&quot;$PORT: `%.*s` isn&#x27;t a whole number&quot;</span>, env.len, env.ptr);
+        }
+    }
+    <span class="k">if</span> (*port &lt; <span class="n">1</span> || *port &gt; <span class="n">65535</span>) {
+        usageError(<span class="s">&quot;the port must be between 1 and 65535, not %d&quot;</span>, *port);
+    }
+    <span class="k">if</span> (*timeout &lt;= <span class="n">0</span>) {
+        usageError(<span class="s">&quot;--timeout must be more than 0 seconds&quot;</span>);
+    }
+
+    printf(<span class="s">&quot;listening on %.*s:%d\n&quot;</span>, host.len, host.ptr, *port);
+    printf(<span class="s">&quot;timeout %gs, verbose %s\n&quot;</span>, *timeout, *verbose ? <span class="s">&quot;on&quot;</span> : <span class="s">&quot;off&quot;</span>);
+    <span class="k">if</span> (fs.nargs() == <span class="n">0</span>) {
+        printf(<span class="s">&quot;serving .\n&quot;</span>);
+    }
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; fs.nargs(); i++) {
+        <span class="t">u8</span>[] dir = fs.arg(i);
+        printf(<span class="s">&quot;serving %.*s\n&quot;</span>, dir.len, dir.ptr);
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm serve.ktm -o serve
+./serve --port eighty
+./serve --colour
+./serve -p</code></pre>
+<pre class="out"><code>serve: --port: `eighty` isn&#x27;t a whole number
+run `serve -h` for help
+serve: unknown flag --colour
+run `serve -h` for help
+serve: -p needs a value
+run `serve -h` for help</code></pre>
+<ul><li><code>fs.parse</code> returns <code>true</code> when the command line is right. When it isn't, <code>fs.error()</code> says why.</li><li><code>-h</code> and <code>--help</code> make <code>fs.parse</code> return <code>false</code> too, with <code>fs.helpAsked()</code> true. Asking for help isn't a mistake: print it to stdout and exit 0.</li><li><code>fs.usage()</code> returns the help as a new <code>String</code>. Free it when you are done.</li></ul>
+<h2 id="subcommands"><a href="#subcommands">Subcommands</a></h2>
+<p>A tool that does several jobs, like <code>git commit</code> and <code>git push</code>, gives each job a subcommand with flags of its own. <code>fs.command</code> makes one: a <code>flag.Set</code> of its own, with its own flags and arguments. After parsing, <code>fs.chosen()</code> says which one was on the command line. This is a second program, <code>site.ktm</code>:</p>
+<pre class="code"><code><span class="k">import</span> flag, libc;
+
+<span class="t">i32</span> main(<span class="t">i32</span> argc, <span class="t">u8</span> **argv) {
+    flag.Set *fs = flag.new(<span class="s">&quot;site&quot;</span>, <span class="s">&quot;builds and serves a static site&quot;</span>);
+    <span class="t">bool</span> *verbose = fs.boolean(<span class="s">&quot;verbose&quot;</span>, <span class="k">false</span>, <span class="s">&quot;say more&quot;</span>, <span class="s">&#x27;v&#x27;</span>);
+
+    flag.Set *build = fs.command(<span class="s">&quot;build&quot;</span>, <span class="s">&quot;writes the site into a directory&quot;</span>);
+    <span class="t">u8</span>[] *out = build.string(<span class="s">&quot;out&quot;</span>, <span class="s">&quot;dist&quot;</span>, <span class="s">&quot;the directory to write&quot;</span>, <span class="s">&#x27;o&#x27;</span>);
+    <span class="t">bool</span> *minify = build.boolean(<span class="s">&quot;minify&quot;</span>, <span class="k">false</span>, <span class="s">&quot;shrink the HTML and CSS&quot;</span>);
+
+    flag.Set *serve = fs.command(<span class="s">&quot;serve&quot;</span>, <span class="s">&quot;serves the site while you edit it&quot;</span>);
+    <span class="t">i64</span> *port = serve.integer(<span class="s">&quot;port&quot;</span>, <span class="n">8080</span>, <span class="s">&quot;the port to listen on&quot;</span>, <span class="s">&#x27;p&#x27;</span>);
+
+    fs.parseOrExit(argc, argv);
+
+    flag.Set *cmd = fs.chosen();
+    <span class="k">if</span> (cmd == build) {
+        printf(<span class="s">&quot;building into %.*s, minify %s\n&quot;</span>, out.len, out.ptr, *minify ? <span class="s">&quot;on&quot;</span> : <span class="s">&quot;off&quot;</span>);
+    } <span class="k">else</span> <span class="k">if</span> (cmd == serve) {
+        printf(<span class="s">&quot;serving on port %d\n&quot;</span>, *port);
+        <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; serve.nargs(); i++) {
+            <span class="t">u8</span>[] page = serve.arg(i);
+            printf(<span class="s">&quot;watching %.*s\n&quot;</span>, page.len, page.ptr);
+        }
+    } <span class="k">else</span> {
+        <span class="t">String</span> help = fs.usage();
+        libc.fprintf(libc.stderr, <span class="s">&quot;%.*s&quot;</span>, help.len, help.ptr);
+        help.free();
+        <span class="k">return</span> <span class="n">2</span>;
+    }
+    <span class="k">if</span> (*verbose) {
+        printf(<span class="s">&quot;done\n&quot;</span>);
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm site.ktm -o site
+./site build
+./site -v build -o public --minify
+./site serve -p 3000 index.md about.md</code></pre>
+<pre class="out"><code>building into dist, minify off
+building into public, minify on
+done
+serving on port 3000
+watching index.md
+watching about.md</code></pre>
+<p>The program's help lists the subcommands, and each subcommand has a help of its own:</p>
+<pre class="code"><code>./site -h
+./site serve -h</code></pre>
+<pre class="out"><code>usage: site [flags] &lt;command&gt; [arguments]
+
+builds and serves a static site
+
+commands:
+  build  writes the site into a directory
+  serve  serves the site while you edit it
+
+flags:
+  -v, --verbose  say more
+  -h, --help     show this help
+usage: site serve [flags] [arguments]
+
+serves the site while you edit it
+
+flags:
+  -p, --port int  the port to listen on (default 8080)
+  -h, --help      show this help</code></pre>
+<p>A flag of another subcommand is a mistake, and the help shown is the subcommand's:</p>
+<pre class="code"><code>./site build --port 1</code></pre>
+<pre class="out"><code>site: unknown flag --port
+
+usage: site build [flags] [arguments]
+
+writes the site into a directory
+
+flags:
+  -o, --out text  the directory to write (default &quot;dist&quot;)
+      --minify    shrink the HTML and CSS
+  -h, --help      show this help</code></pre>
+<ul><li>The program's own flags, here <code>-v</code>, go before the subcommand's name. Everything after the name belongs to the subcommand: <code>./site build -v</code> is an unknown flag.</li><li>The first word that isn't a flag must be a subcommand's name: <code>./site deploy</code> stops with an unknown command error and the help.</li><li><code>fs.chosen()</code> is <code>null</code> when no subcommand was given. This program prints the help to stderr and exits 2 then.</li><li>A subcommand's arguments are its own: <code>serve.nargs()</code> and <code>serve.arg(i)</code>.</li><li><code>fs.free()</code> frees the Set, its subcommands and every value. The pointers the flags returned dangle after it, so a program that keeps its flags until it ends never needs to call it.</li></ul>
+<h2 id="reference"><a href="#reference">Reference</a></h2>
+<div class="table"><table><thead><tr><th>Call</th><th>What it does</th></tr></thead><tbody><tr><td><code>flag.new(name, about)</code></td><td>a new Set for a program called <code>name</code></td></tr><tr><td><code>fs.integer(name, def, usage, short)</code></td><td>a whole-number flag; returns an <code>i64 *</code></td></tr><tr><td><code>fs.number(name, def, usage, short)</code></td><td>a number flag; returns an <code>f64 *</code></td></tr><tr><td><code>fs.string(name, def, usage, short)</code></td><td>a text flag; returns a <code>u8[] *</code></td></tr><tr><td><code>fs.boolean(name, def, usage, short)</code></td><td>an on/off flag; returns a <code>bool *</code></td></tr><tr><td><code>fs.command(name, about)</code></td><td>a subcommand: a Set of its own</td></tr><tr><td><code>fs.parseOrExit(argc, argv)</code></td><td>parses; <code>-h</code> prints the help and exits 0, a mistake exits 2</td></tr><tr><td><code>fs.parse(argc, argv)</code></td><td>parses; <code>false</code> on a mistake or <code>-h</code></td></tr><tr><td><code>fs.parseFrom(argc, argv, from)</code></td><td>parses from <code>argv[from]</code> instead of <code>argv[1]</code></td></tr><tr><td><code>fs.error()</code></td><td>why <code>parse</code> returned <code>false</code></td></tr><tr><td><code>fs.helpAsked()</code></td><td>was <code>-h</code> or <code>--help</code> given?</td></tr><tr><td><code>fs.usage()</code></td><td>the help, as a new <code>String</code></td></tr><tr><td><code>fs.given(name)</code></td><td>was the flag on the command line?</td></tr><tr><td><code>fs.nargs()</code>, <code>fs.arg(i)</code></td><td>the arguments that aren't flags; <code>&quot;&quot;</code> past the end</td></tr><tr><td><code>fs.chosen()</code></td><td>the subcommand given, or <code>null</code></td></tr><tr><td><code>fs.free()</code></td><td>frees the Set, its subcommands and the values</td></tr></tbody></table></div>
+<p>The whole module is in the <a href="../std/#flag.Set">library reference</a>.</p>
+<h2 id="rules-of-thumb"><a href="#rules-of-thumb">Rules of thumb</a></h2>
+<ul><li><strong>Give every flag a default that works.</strong> A program run with no flags at all should do the common thing.</li><li><strong>Give short names to the flags people type often</strong>, and only to those. Long names are what scripts should use: they still read well a year later.</li><li><strong>Write the usage line for the help.</strong> Say what the value is and its unit (<code>seconds to wait</code>), not the flag's name again.</li><li><strong>Check values right after parsing</strong>, before the program does any work, and exit 2 with one line that says what is wrong.</li><li><strong>Help goes to stdout with exit code 0; a mistake goes to stderr with exit code 2.</strong> Then <code>serve -h | less</code> works, and scripts can tell a mistake from a failure.</li></ul>
+    <nav class="pager"><a class="prev" href="04-postgresql.html"><span>Previous</span>PostgreSQL</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#what-you-need">What you need</a></li><li><a href="#the-first-flag">The first flag</a></li><li><a href="#four-kinds-of-flag">Four kinds of flag</a></li><li><a href="#ways-to-write-a-flag">Ways to write a flag</a></li><li><a href="#arguments-that-aren-t-flags">Arguments that aren&#x27;t flags</a></li><li><a href="#checking-values-and-port">Checking values and $PORT</a></li><li><a href="#your-own-error-messages">Your own error messages</a></li><li><a href="#subcommands">Subcommands</a></li><li><a href="#reference">Reference</a></li><li><a href="#rules-of-thumb">Rules of thumb</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.26.0</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="../roadmap.html">Roadmap</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>
