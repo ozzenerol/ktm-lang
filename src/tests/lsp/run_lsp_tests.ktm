@@ -118,6 +118,9 @@ u8 *ALIAS_HC;
 u8 *PKG_MOD;
 u8 *PKG_BOX_HC;
 u8 *PKG_USE_HC;
+u8 *PKG_GEN_HC;
+u8 *APP_MOD;
+u8 *APP_MAIN_HC;
 u8 *CALC_HC;
 u8 *CALC_TRIPLE_HC;
 u8 *CALC_MAIN_HC;
@@ -154,6 +157,24 @@ void initFixtures() {
     PKG_USE_HC =
         "module box;\n"
         "pub i64 peek(Box *b) { return b.v + secret(); }\n";
+    PKG_GEN_HC =
+        "module box;\n"
+        "pub T pick<T>(T a, T b) { return a; }\n";
+    /* app imports ktm-box by its package path, through a replace */
+    APP_MOD =
+        "module example.com/app\n\nktm 0.22\n\n"
+        "require example.com/ktm-box v0.0.0\n\n"
+        "replace example.com/ktm-box => ../ktm-box\n";
+    APP_MAIN_HC =
+        "import \"example.com/ktm-box\";\n"
+        "import other = \"example.com/ktm-box\";\n"
+        "\n"
+        "i32 main() {\n"
+        "    box.Box b;\n"
+        "    i64 n = box.peek(&b);\n"
+        "    i64 m = box.pick<i64>(n, 2);\n"
+        "    return (i32)(m + other.peek(&b));\n"
+        "}\n";
     /* calc gains triple (and an unused import) while calcmain.ktm,
      * which calls it, is open */
     CALC_HC =
@@ -1547,7 +1568,7 @@ void testReferences() {
 
 /* ---------------- driver ---------------- */
 
-const i64 LSP_GROUPS = 23;
+const i64 LSP_GROUPS = 24;
 
 /* Files that read each other show no error they don't have: a
  * package's module in a directory named otherwise, an importer whose
@@ -1577,6 +1598,47 @@ void testCrossFile() {
     u8 *main2Uri = uriOf("calcmain2.ktm");
     lspDidOpen(l, main2Uri, CALC_MAIN2_HC);
     check("an imported file's warning is not the importer's", lastPublishClean(l));
+    lspClose(l);
+}
+
+/* A package imported by its path (`import "example.com/ktm-box";`, in
+ * a directory of its own through a replace): definition and hover reach
+ * its names (a function, a struct, a generic, through an alias), and
+ * hover shows them as the code writes them (box.peek) */
+void testPackages() {
+    printf("packages\n");
+    LspClient *l = lspStart();
+    u8 *uri = uriOf("app/main.ktm");
+    lspDidOpen(l, uri, APP_MAIN_HC);
+    lspSettle(l, 1500);       /* the first analysis reads the package */
+    i64 line;
+    i64 chr;
+    i64 wantLine;
+    i64 wantChr;
+
+    posOf(APP_MAIN_HC, "peek(&b);\n    i64 m", 0, &line, &chr);
+    json.Value *resp = lspPositionRequest(l, "textDocument/definition", uri, line, chr);
+    posOf(PKG_USE_HC, "peek", 0, &wantLine, &wantChr);
+    check("a package's function: definition", locEq(resp, uriOf("ktm-box/use.ktm"), wantLine, wantChr, true));
+
+    posOf(APP_MAIN_HC, "Box b", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/definition", uri, line, chr);
+    posOf(PKG_BOX_HC, "Box", 0, &wantLine, &wantChr);
+    check("a package's struct: definition", locEq(resp, uriOf("ktm-box/box.ktm"), wantLine, wantChr, true));
+
+    posOf(APP_MAIN_HC, "pick<i64>", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/definition", uri, line, chr);
+    posOf(PKG_GEN_HC, "pick", 0, &wantLine, &wantChr);
+    check("a package's generic function: definition", locEq(resp, uriOf("ktm-box/gen.ktm"), wantLine, wantChr, true));
+
+    posOf(APP_MAIN_HC, "peek(&b))", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/definition", uri, line, chr);
+    posOf(PKG_USE_HC, "peek", 0, &wantLine, &wantChr);
+    check("a package imported under another name: definition", locEq(resp, uriOf("ktm-box/use.ktm"), wantLine, wantChr, true));
+
+    posOf(APP_MAIN_HC, "peek(&b);\n    i64 m", 0, &line, &chr);
+    resp = lspPositionRequest(l, "textDocument/hover", uri, line, chr);
+    check("hover shows a package's names as written", hoverContains(resp, "i64 box.peek(box.Box *b)"));
     lspClose(l);
 }
 
@@ -2352,6 +2414,7 @@ void runGroup(i64 group) {
         case 20: testFoldingAndHints();
         case 21: testCrossFile();
         case 22: testAutoImport();
+        case 23: testPackages();
     }
 }
 
@@ -2423,8 +2486,8 @@ i32 main() {
     u8 tmp[128];
     libc.snprintf(tmp, 128, "/tmp/ktm_lsp_test_%d", getpid());
     u8 cmd[512];
-    libc.snprintf(cmd, 512, "mkdir -p %s/sub %s/geo %s/bag %s/order %s/ktm-box %s/calc",
-                  tmp, tmp, tmp, tmp, tmp, tmp);
+    libc.snprintf(cmd, 512, "mkdir -p %s/sub %s/geo %s/bag %s/order %s/ktm-box %s/calc %s/app",
+                  tmp, tmp, tmp, tmp, tmp, tmp, tmp);
     proc.shell(cmd);
     gDir = mem.alloc(1024);
     realpath(tmp, gDir);
@@ -2466,6 +2529,12 @@ i32 main() {
     fs.writeAll(path, cstr.view(PKG_BOX_HC));
     libc.snprintf(path, 512, "%s/ktm-box/use.ktm", gDir);
     fs.writeAll(path, cstr.view(PKG_USE_HC));
+    libc.snprintf(path, 512, "%s/ktm-box/gen.ktm", gDir);
+    fs.writeAll(path, cstr.view(PKG_GEN_HC));
+    libc.snprintf(path, 512, "%s/app/ktm.mod", gDir);
+    fs.writeAll(path, cstr.view(APP_MOD));
+    libc.snprintf(path, 512, "%s/app/main.ktm", gDir);
+    fs.writeAll(path, cstr.view(APP_MAIN_HC));
     libc.snprintf(path, 512, "%s/calc/calc.ktm", gDir);
     fs.writeAll(path, cstr.view(CALC_HC));
     libc.snprintf(path, 512, "%s/calcmain.ktm", gDir);
