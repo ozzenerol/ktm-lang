@@ -3,6 +3,27 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.28.0 <small>(2026-10-16)</small></h2>
+<p>Reading what people type, with line editing and a history, as GNU readline does.</p>
+
+<h3>term: reading lines</h3>
+<ul>
+  <li><code>term.readLine(prompt, &amp;line)</code> shows a prompt (markup allowed) and reads a line;
+  <code>false</code> when the input ends (Ctrl-D on an empty line, or the end of a pipe). On a terminal
+  the line can be edited with the keys of bash: Left/Right, Home/End, Ctrl-A/E/B/F, a word at a time
+  with Ctrl-Left/Right and Alt-B/F, Backspace, Delete, Ctrl-W, Ctrl-U, Ctrl-K; Ctrl-L clears the
+  screen and Ctrl-C drops the line. A long line scrolls sideways. From a pipe or a file, lines are read
+  as they come.</li>
+  <li>The history: Up/Down (Ctrl-P/N) go through the lines typed before, which <code>readLine</code>
+  adds by itself (not empty lines or a repeat). <code>term.historyFile(path)</code> keeps them between
+  runs; <code>historyAdd</code>, <code>historyAuto</code>, <code>historyMax</code>,
+  <code>historyLen</code>, <code>historyAt</code> and <code>historyClear</code> manage it.</li>
+  <li><code>term.readPassword(prompt, &amp;line)</code> reads a line without showing it and keeps it out
+  of the history. <code>term.clear()</code> clears the terminal.</li>
+  <li>The <a href="guides/06-terminal-output.html#reading-what-people-type">terminal guide</a> builds a
+  small interactive program with them.</li>
+</ul>
+
 <h2>v0.27.1 <small>(2026-10-16)</small></h2>
 <p>Range for over a map, closable sidebars and chapter descriptions on the docs site, and a steadier
 test.</p>
