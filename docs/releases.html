@@ -24,7 +24,7 @@
       <kbd>/</kbd>
       <ul id="site-results" class="results" hidden></ul>
     </div>
-    <span class="ver">v0.27.0</span>
+    <span class="ver">v0.27.1</span>
     <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
   </div>
 </header>
@@ -33,6 +33,22 @@
 <p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
+
+<h2>v0.27.1 <small>(2026-10-16)</small></h2>
+<p>Range for over a map, chapter descriptions on the docs site, and a steadier test.</p>
+
+<h3>Fixes</h3>
+<ul>
+  <li><code>for (auto e : m)</code> over a <code>map.Map</code> gives each entry, with <code>e.key</code>
+  and <code>e.value</code>, in the order the keys were added; deleted keys are skipped. It works on a
+  map held by value, through a pointer or as a field, with <code>break</code> and <code>continue</code>.
+  Before, it was refused with "Range for loop must be on a struct with both a 'size' and 'entries'
+  property". Ranging over <code>m.entries</code> now says to range over the map itself.</li>
+  <li>Docs site: the language chapters and the Quick Guides list their descriptions on the index pages,
+  and every chapter page has a meta description.</li>
+  <li>Test 534 (<code>coro.waitChild</code>) no longer fails now and then on a loaded machine: its
+  children end in a fixed order whatever their start-up time.</li>
+</ul>
 
 <h2>v0.27.0 <small>(2026-10-16)</small></h2>
 <p>A new standard library module for the output of command-line programs, and two Quick Guides.</p>
@@ -1667,7 +1683,7 @@ only names are new.</p>
 </main>
 <footer>
   <div class="bar">
-    <span>ktm v0.27.0</span>
+    <span>ktm v0.27.1</span>
     <a href="releases.html">Releases</a>
     <a href="known-issues.html">Known issues</a>
     <a href="roadmap.html">Roadmap</a>
