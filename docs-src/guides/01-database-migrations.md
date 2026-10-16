@@ -2,7 +2,7 @@
 
 Keep a database's schema in numbered SQL files and let your program bring any database up to
 date with [ktm-migrate](https://github.com/ozzenerol/ktm-migrate). This guide builds a small notes
-program on SQLite, step by step: the first migrations, a `migrate` command, migrating at start-up,
+program on SQLite, step by step: the first migrations, status, going back, migrating at start-up,
 changes SQLite can't make with `ALTER TABLE`, failures, tests and migrations built into the
 binary. Then the same program on PostgreSQL, several instances starting at once, migrations from
 merged branches, and a driver of your own.
@@ -183,64 +183,17 @@ $ sqlite3 notes.db 'SELECT * FROM schema_migrations'
 2|create_tags|2026-10-16 01:58:02
 ```
 
-## A migrate command
+## See where a database is
 
-A real program needs more than `up`. It needs a way to see where a database is, to undo the last
-change while developing, and to move to a given version. Here is the whole `main.ktm`, with a
-`migrate` command for all of that:
+`ms.status(&d)` lists every migration and whether the database has it. This `main.ktm` applies
+what is pending, then prints the list:
 
 ```ktm
 import "github.com/ozzenerol/ktm-migrate";
 import "github.com/ozzenerol/ktm-migrate/sqlite";
-import cstr, sql, str, vec;
+import sql, vec;
 
-void usage() {
-    printf("usage: notes migrate up | down [n] | to <version> | status | version\n");
-}
-
-/* arg as a whole number, or -1 */
-i64 number(u8 *arg) {
-    i64 n;
-    if (!str.toInt(cstr.view(arg), &n) || n < 0) { return -1; }
-    return n;
-}
-
-i32 migrateCommand(migrate.Migrations *ms, migrate.Driver *d, i32 argc, u8 **argv) {
-    u8[] cmd = argc > 2 ? cstr.view(argv[2]) : "";
-    if (str.equals(cmd, "up")) {
-        i64 n = ms.up(d);
-        printf("%d migration(s) applied, version %d\n", n, migrate.version(d));
-    } else if (str.equals(cmd, "down")) {
-        i64 n = argc > 3 ? number(argv[3]) : 1;
-        if (n < 1) { usage(); return 2; }
-        i64 r = ms.down(d, n);
-        printf("%d migration(s) reverted, version %d\n", r, migrate.version(d));
-    } else if (str.equals(cmd, "to") && argc > 3) {
-        i64 v = number(argv[3]);
-        if (v < 0) { usage(); return 2; }
-        i64 r = ms.to(d, v);
-        printf("%d migration(s) ran, version %d\n", r, migrate.version(d));
-    } else if (str.equals(cmd, "status")) {
-        vec.Vec<migrate.Status> st = ms.status(d);
-        defer st.free();
-        for (auto s : st) {
-            printf("%4d  %-8s %.*s\n", s.version, s.applied ? "applied" : "pending",
-                   s.name.len, s.name.ptr);
-        }
-    } else if (str.equals(cmd, "version")) {
-        printf("%d\n", migrate.version(d));
-    } else {
-        usage();
-        return 2;
-    }
-    return 0;
-}
-
-i32 main(i32 argc, u8 **argv) {
-    if (argc < 2 || !str.equals(cstr.view(argv[1]), "migrate")) {
-        usage();
-        return 2;
-    }
+i32 main() {
     sql.Db *db = sql.open("notes.db");
     if (!db) {
         printf("can't open notes.db\n");
@@ -248,62 +201,111 @@ i32 main(i32 argc, u8 **argv) {
     }
     defer sql.close(db);
 
-    try {
-        migrate.Migrations ms = migrate.load("migrations");
-        defer ms.free();
-        migrate.Driver d = sqlite.driver(db);
-        return migrateCommand(&ms, &d, argc, argv);
-    } catch (Error e) {
-        printf("%s\n", e.message);
-        return 1;
+    migrate.Migrations ms = migrate.load("migrations");
+    defer ms.free();
+    migrate.Driver d = sqlite.driver(db);
+    i64 n = ms.up(&d);
+    printf("%d migration(s) applied, version %d\n", n, migrate.version(&d));
+
+    vec.Vec<migrate.Status> st = ms.status(&d);
+    defer st.free();
+    for (auto s : st) {
+        printf("%4d  %-8s %.*s\n", s.version, s.applied ? "applied" : "pending", s.name.len, s.name.ptr);
     }
     return 0;
 }
 ```
 
-Every call of the runner throws `migrate.ERR_MIGRATE` when something goes wrong, and so does
-`load`. The message names the file and says what the database said, so `main` catches it and
-prints it. [When a migration fails](#when-a-migration-fails) shows what the messages look like.
+```sh
+$ ktm build
+$ ./notes
+2 migration(s) applied, version 2
+   1  applied  create_notes
+   2  applied  create_tags
+$ ./notes
+0 migration(s) applied, version 2
+   1  applied  create_notes
+   2  applied  create_tags
+```
 
-On a new database:
+- `ms.status(&d)` returns a `vec.Vec<migrate.Status>` with `version`, `name` and `applied` for each
+  migration. The vector is yours to free. The names are views of `ms`, so free `ms` after you are
+  done with them.
+- A migration the database doesn't have yet shows as `pending`.
+
+## Going back
+
+Three more calls move a database the other way. This `main.ktm` goes through all of them on the
+same two migrations:
+
+```ktm
+import "github.com/ozzenerol/ktm-migrate";
+import "github.com/ozzenerol/ktm-migrate/sqlite";
+import sql;
+
+i32 main() {
+    sql.Db *db = sql.open("notes.db");
+    if (!db) {
+        printf("can't open notes.db\n");
+        return 1;
+    }
+    defer sql.close(db);
+
+    migrate.Migrations ms = migrate.load("migrations");
+    defer ms.free();
+    migrate.Driver d = sqlite.driver(db);
+
+    i64 n = ms.up(&d);
+    printf("up:      %d ran, version %d\n", n, migrate.version(&d));
+    n = ms.down(&d);
+    printf("down:    %d ran, version %d\n", n, migrate.version(&d));
+    n = ms.to(&d, 2);
+    printf("to 2:    %d ran, version %d\n", n, migrate.version(&d));
+    n = ms.to(&d, 0);
+    printf("to 0:    %d ran, version %d\n", n, migrate.version(&d));
+    n = ms.up(&d);
+    printf("up:      %d ran, version %d\n", n, migrate.version(&d));
+    n = ms.down(&d, 5);
+    printf("down 5:  %d ran, version %d\n", n, migrate.version(&d));
+    try {
+        ms.to(&d, 7);
+    } catch (Error e) {
+        printf("to 7:    %s\n", e.message);
+    }
+    return 0;
+}
+```
 
 ```sh
 $ ktm build
-$ ./notes migrate status
-   1  pending  create_notes
-   2  pending  create_tags
-$ ./notes migrate up
-2 migration(s) applied, version 2
-$ ./notes migrate status
-   1  applied  create_notes
-   2  applied  create_tags
-$ ./notes migrate version
-2
-$ ./notes migrate down
-1 migration(s) reverted, version 1
-$ ./notes migrate to 0
-1 migration(s) ran, version 0
-$ ./notes migrate to 2
-2 migration(s) ran, version 2
-$ ./notes migrate down 5
-2 migration(s) reverted, version 0
-$ ./notes migrate to 7
-migrate: there is no migration 7
+$ rm -f notes.db
+$ ./notes
+up:      2 ran, version 2
+down:    1 ran, version 1
+to 2:    1 ran, version 2
+to 0:    2 ran, version 0
+up:      2 ran, version 2
+down 5:  2 ran, version 0
+to 7:    migrate: there is no migration 7
 ```
 
-- `ms.status(&d)` lists every migration with `version`, `name` and `applied`. The `vec.Vec` is
-  yours to free. The names are views of `ms`, so free `ms` after you are done with them.
-- `ms.down(&d, n)` reverts the newest `n` applied migrations, newest first. Without `n` it reverts
-  one. It stops early when nothing is left, so `down 5` on two migrations reverts two.
+- `ms.down(&d)` reverts the newest applied migration. `ms.down(&d, n)` reverts the newest `n`,
+  newest first, and stops early when nothing is left: `down 5` on two migrations reverts two.
 - `ms.to(&d, version)` goes up or down until `version` is the newest applied. `to 0` reverts
   everything. A version that isn't a migration is an error.
-- A down script throws away what its up script made. `down` on `create_tags` drops the tags,
-  along with every row in that table. Use it while developing, and think twice in production.
+- Every call returns how many migrations ran.
+- Every call throws `migrate.ERR_MIGRATE` when something goes wrong, and so does `load`. The
+  message names the file and says what the database said. [When a migration
+  fails](#when-a-migration-fails) shows what the messages look like.
+- A down script throws away what its up script made. Reverting `create_tags` drops the tags,
+  with every row in that table. Going back is for development and for undoing a bad deploy, and
+  it costs data.
 
 ## Migrating at start-up
 
-The usual place to migrate is when the program starts, before it serves anything. Then a new
-build that needs a new column brings it along. Add a third migration, a `pinned` flag on notes.
+The usual place to migrate is when the program starts, before it does anything else. A new
+build that needs a new column then brings it along. Add a third migration, a `pinned` flag on
+notes.
 
 `migrations/003_add_pinned.up.sql`:
 
@@ -319,102 +321,44 @@ ALTER TABLE notes DROP COLUMN pinned;
 
 `DROP COLUMN` needs SQLite 3.35 (2021) or newer.
 
-The program gets three commands of its own, `add`, `pin` and `list`. Each runs after `ms.up`, so
-it always finds the tables it expects. The `migrate` command stays as it was. `usage` changes;
-`number` and `migrateCommand` are the same as in the last section and are repeated here so the
-file is whole:
+Now `main.ktm` is a program that uses the database. It migrates first, then lists the notes,
+pinned ones first:
 
 ```ktm
 import "github.com/ozzenerol/ktm-migrate";
 import "github.com/ozzenerol/ktm-migrate/sqlite";
-import cstr, sql, str, vec;
+import sql;
 
-void usage() {
-    printf("usage: notes add <title> [body] | pin <id> | list\n"
-           "       notes migrate up | down [n] | to <version> | status | version\n");
-}
-
-/* arg as a whole number, or -1 */
-i64 number(u8 *arg) {
-    i64 n;
-    if (!str.toInt(cstr.view(arg), &n) || n < 0) { return -1; }
-    return n;
-}
-
-i32 migrateCommand(migrate.Migrations *ms, migrate.Driver *d, i32 argc, u8 **argv) {
-    u8[] cmd = argc > 2 ? cstr.view(argv[2]) : "";
-    if (str.equals(cmd, "up")) {
-        i64 n = ms.up(d);
-        printf("%d migration(s) applied, version %d\n", n, migrate.version(d));
-    } else if (str.equals(cmd, "down")) {
-        i64 n = argc > 3 ? number(argv[3]) : 1;
-        if (n < 1) { usage(); return 2; }
-        i64 r = ms.down(d, n);
-        printf("%d migration(s) reverted, version %d\n", r, migrate.version(d));
-    } else if (str.equals(cmd, "to") && argc > 3) {
-        i64 v = number(argv[3]);
-        if (v < 0) { usage(); return 2; }
-        i64 r = ms.to(d, v);
-        printf("%d migration(s) ran, version %d\n", r, migrate.version(d));
-    } else if (str.equals(cmd, "status")) {
-        vec.Vec<migrate.Status> st = ms.status(d);
-        defer st.free();
-        for (auto s : st) {
-            printf("%4d  %-8s %.*s\n", s.version, s.applied ? "applied" : "pending",
-                   s.name.len, s.name.ptr);
+/* Brings the database up to date: false when a migration failed */
+bool migrateDb(sql.Db *db) {
+    try {
+        migrate.Migrations ms = migrate.load("migrations");
+        defer ms.free();
+        migrate.Driver d = sqlite.driver(db);
+        i64 n = ms.up(&d);
+        if (n) {
+            printf("%d migration(s) applied, version %d\n", n, migrate.version(&d));
         }
-    } else if (str.equals(cmd, "version")) {
-        printf("%d\n", migrate.version(d));
-    } else {
-        usage();
-        return 2;
+    } catch (Error e) {
+        printf("%s\n", e.message);
+        return false;
     }
-    return 0;
+    return true;
 }
 
-i32 add(sql.Db *db, u8 *title, u8 *body) {
-    sql.Param p[2];
-    p[0].type = sql.TEXT;
-    p[0].str = cstr.view(title);
-    p[1].type = sql.TEXT;
-    p[1].str = cstr.view(body);
-    if (!sql.exec(db, "INSERT INTO notes (title, body) VALUES (?, ?)", p, 2)) {
-        printf("%s\n", sql.sqlite3_errmsg(db.conn));
-        return 1;
-    }
-    return 0;
-}
-
-i32 pin(sql.Db *db, u8 *arg) {
-    sql.Param p[1];
-    p[0].type = sql.INT;
-    p[0].intVal = number(arg);
-    if (!sql.exec(db, "UPDATE notes SET pinned = 1 WHERE id = ?", p, 1)) {
-        printf("%s\n", sql.sqlite3_errmsg(db.conn));
-        return 1;
-    }
-    return 0;
-}
-
-i32 list(sql.Db *db) {
+void listNotes(sql.Db *db) {
     sql.Row row;
     if (!sql.select(db, &row, "SELECT id, pinned, title FROM notes ORDER BY pinned DESC, id")) {
         printf("%s\n", sql.sqlite3_errmsg(db.conn));
-        return 1;
+        return;
     }
     while (sql.next(&row)) {
         printf("%3d %s %.*s\n", row.col[0].intVal, row.col[1].intVal ? "*" : " ",
                row.col[2].str.len, row.col[2].str.ptr);
     }
-    return 0;
 }
 
-i32 main(i32 argc, u8 **argv) {
-    if (argc < 2) {
-        usage();
-        return 2;
-    }
-    u8[] cmd = cstr.view(argv[1]);
+i32 main() {
     sql.Db *db = sql.open("notes.db");
     if (!db) {
         printf("can't open notes.db\n");
@@ -423,63 +367,30 @@ i32 main(i32 argc, u8 **argv) {
     defer sql.close(db);
     sql.exec(db, "PRAGMA foreign_keys = ON");
 
-    try {
-        migrate.Migrations ms = migrate.load("migrations");
-        defer ms.free();
-        migrate.Driver d = sqlite.driver(db);
-        if (str.equals(cmd, "migrate")) {
-            return migrateCommand(&ms, &d, argc, argv);
-        }
-        ms.up(&d);
-    } catch (Error e) {
-        printf("%s\n", e.message);
+    if (!migrateDb(db)) {
         return 1;
     }
-
-    if (str.equals(cmd, "add") && argc > 2) {
-        return add(db, argv[2], argc > 3 ? argv[3] : "");
-    } else if (str.equals(cmd, "pin") && argc > 2) {
-        return pin(db, argv[2]);
-    } else if (str.equals(cmd, "list")) {
-        return list(db);
-    }
-    usage();
-    return 2;
+    listNotes(db);
+    return 0;
 }
 ```
 
+`migrateDb` prints only when something ran, so a normal start is quiet. When a migration fails
+the program stops, instead of running against a schema it doesn't expect.
+
 ```sh
 $ ktm build
-$ ./notes add "buy milk"
-$ ./notes add "call ann" "about the trip"
-$ ./notes add "fix the bike"
-$ ./notes pin 2
-$ ./notes list
-  2 * call ann
-  1   buy milk
-  3   fix the bike
-$ ./notes migrate status
-   1  applied  create_notes
-   2  applied  create_tags
-   3  applied  add_pinned
-```
-
-The first `add` found the database at version 2, so it applied `add_pinned` first. A copy of
-the program that is still at version 2 somewhere else will do the same on its next start.
-
-Reverting `add_pinned` drops the column and the pins with it. The next normal command applies it
-again, with every pin at its default, `0`:
-
-```sh
-$ ./notes migrate down
-1 migration(s) reverted, version 2
-$ ./notes list
+$ ./notes
+3 migration(s) applied, version 3
+$ sqlite3 notes.db "INSERT INTO notes (title) VALUES ('buy milk'), ('call ann'), ('fix the bike')"
+$ ./notes
   1   buy milk
   2   call ann
   3   fix the bike
-$ ./notes migrate up
-0 migration(s) applied, version 3
 ```
+
+The last section left the database at version 0, so the first start applied all three. A copy
+of the program whose database is at version 2 applies only `add_pinned` on its next start.
 
 - Migrate before anything else touches the database: before a server listens, before workers
   start.
@@ -544,19 +455,21 @@ PRAGMA foreign_keys = ON;
 ```
 
 ```sh
-$ ./notes pin 2
-$ ./notes migrate up
+$ sqlite3 notes.db "UPDATE notes SET pinned = 1 WHERE id = 2"
+$ sqlite3 notes.db "INSERT INTO tags VALUES (2, 'family')"
+$ ./notes
 1 migration(s) applied, version 4
-$ ./notes list
   2 * call ann
   1   buy milk
   3   fix the bike
-$ ./notes add "$(printf 'x%.0s' $(seq 1 201))"
-CHECK constraint failed: length(title) <= 200
+$ sqlite3 notes.db "SELECT * FROM tags"
+2|family
+$ sqlite3 notes.db "INSERT INTO notes (title) VALUES ('$(printf 'x%.0s' $(seq 1 201))')"
+Error: stepping, CHECK constraint failed: length(title) <= 200 (19)
 ```
 
-The notes and the pin survived, and so does every tag: with foreign keys on, `DROP TABLE notes`
-would have deleted them all. The new table has the limit.
+The notes, the pin and the tag survived: with foreign keys on, `DROP TABLE notes` would have
+deleted every tag. The new table has the limit.
 
 - The marker must be the first line of the script, exactly `-- migrate: no-transaction`
   (whitespace around it doesn't matter).
@@ -582,20 +495,20 @@ INSERT INTO notebook (name) VALUES ('inbox');
 ```
 
 ```sh
-$ ./notes migrate up
+$ ./notes
 migrate: 5_add_notebooks.up.sql: no such table: notebook
-$ ./notes migrate status
-   1  applied  create_notes
-   2  applied  create_tags
-   3  applied  add_pinned
-   4  applied  title_limit
-   5  pending  add_notebooks
+$ sqlite3 notes.db "SELECT version, name FROM schema_migrations"
+1|create_notes
+2|create_tags
+3|add_pinned
+4|title_limit
 $ sqlite3 notes.db "SELECT name FROM sqlite_master WHERE name = 'notebooks'"
 $
 ```
 
-The `notebooks` table the first statement made is gone too, since the whole migration was one
-transaction. Fix the file and run `up` again. The file name in the message is built from the
+Version 5 isn't recorded, and the `notebooks` table its first statement made is gone too, since
+the whole migration was one transaction. The program stopped before listing anything. Fix the
+file and start it again. The file name in the message is built from the
 version number, so `005_add_notebooks` shows as `5_add_notebooks`.
 
 To act on the failure in code, catch the error and look at its code:
@@ -817,69 +730,30 @@ Without a transaction, a failed `CREATE INDEX CONCURRENTLY` isn't rolled back: i
 invalid index named `tags_by_tag` behind, and `IF NOT EXISTS` would then skip it on the next run.
 After such a failure, `DROP INDEX tags_by_tag` before running the migration again.
 
-`main.ktm` connects with ktm-pg and makes the driver with `postgres.driver(c)`. `usage`, `number`
-and `migrateCommand` are the same as in [A migrate command](#a-migrate-command):
+`main.ktm` connects with ktm-pg, makes the driver with `postgres.driver(c)`, applies what is
+pending and prints the status:
 
 ```ktm
 import "github.com/ozzenerol/ktm-pg";
 import "github.com/ozzenerol/ktm-migrate";
 import "github.com/ozzenerol/ktm-migrate/postgres";
-import cstr, str, vec;
+import vec;
 
-void usage() {
-    printf("usage: notes migrate up | down [n] | to <version> | status | version\n");
-}
-
-/* arg as a whole number, or -1 */
-i64 number(u8 *arg) {
-    i64 n;
-    if (!str.toInt(cstr.view(arg), &n) || n < 0) { return -1; }
-    return n;
-}
-
-i32 migrateCommand(migrate.Migrations *ms, migrate.Driver *d, i32 argc, u8 **argv) {
-    u8[] cmd = argc > 2 ? cstr.view(argv[2]) : "";
-    if (str.equals(cmd, "up")) {
-        i64 n = ms.up(d);
-        printf("%d migration(s) applied, version %d\n", n, migrate.version(d));
-    } else if (str.equals(cmd, "down")) {
-        i64 n = argc > 3 ? number(argv[3]) : 1;
-        if (n < 1) { usage(); return 2; }
-        i64 r = ms.down(d, n);
-        printf("%d migration(s) reverted, version %d\n", r, migrate.version(d));
-    } else if (str.equals(cmd, "to") && argc > 3) {
-        i64 v = number(argv[3]);
-        if (v < 0) { usage(); return 2; }
-        i64 r = ms.to(d, v);
-        printf("%d migration(s) ran, version %d\n", r, migrate.version(d));
-    } else if (str.equals(cmd, "status")) {
-        vec.Vec<migrate.Status> st = ms.status(d);
-        defer st.free();
-        for (auto s : st) {
-            printf("%4d  %-8s %.*s\n", s.version, s.applied ? "applied" : "pending",
-                   s.name.len, s.name.ptr);
-        }
-    } else if (str.equals(cmd, "version")) {
-        printf("%d\n", migrate.version(d));
-    } else {
-        usage();
-        return 2;
-    }
-    return 0;
-}
-
-i32 main(i32 argc, u8 **argv) {
-    if (argc < 2 || !str.equals(cstr.view(argv[1]), "migrate")) {
-        usage();
-        return 2;
-    }
+i32 main() {
     try {
         pg.Conn *c = pg.connect();      /* PGHOST, PGUSER, ... or a URL */
         defer c.close();
         migrate.Migrations ms = migrate.load("migrations");
         defer ms.free();
         migrate.Driver d = postgres.driver(c);
-        return migrateCommand(&ms, &d, argc, argv);
+        i64 n = ms.up(&d);
+        printf("%d migration(s) applied, version %d\n", n, migrate.version(&d));
+
+        vec.Vec<migrate.Status> st = ms.status(&d);
+        defer st.free();
+        for (auto s : st) {
+            printf("%4d  %-8s %.*s\n", s.version, s.applied ? "applied" : "pending", s.name.len, s.name.ptr);
+        }
     } catch (Error e) {
         printf("%s\n", e.message);
         return 1;
@@ -895,26 +769,24 @@ throws when it can't connect, so it goes inside the `try`.
 ```sh
 $ export PGHOST=127.0.0.1 PGUSER=postgres PGPASSWORD=secret PGDATABASE=notes
 $ ktm build
-$ ./notes migrate status
-   1  pending  create_notes
-   2  pending  create_tags
-   3  pending  index_tags
-$ ./notes migrate up
+$ ./notes
 3 migration(s) applied, version 3
-$ ./notes migrate down
-1 migration(s) reverted, version 2
-$ ./notes migrate to 0
-2 migration(s) ran, version 0
-$ ./notes migrate up
-3 migration(s) applied, version 3
-$ PGPASSWORD=wrong ./notes migrate up
+   1  applied  create_notes
+   2  applied  create_tags
+   3  applied  index_tags
+$ ./notes
+0 migration(s) applied, version 3
+   1  applied  create_notes
+   2  applied  create_tags
+   3  applied  index_tags
+$ PGPASSWORD=wrong ./notes
 pg: FATAL: password authentication failed for user "postgres" (SQLSTATE 28P01)
 $ psql -c 'SELECT * FROM schema_migrations'
  version |     name     |         applied_at
 ---------+--------------+----------------------------
-       1 | create_notes | 2026-10-16 02:05:19.15737
-       2 | create_tags  | 2026-10-16 02:05:19.161077
-       3 | index_tags   | 2026-10-16 02:05:19.163924
+       1 | create_notes | 2026-10-16 02:09:08.072007
+       2 | create_tags  | 2026-10-16 02:09:08.073708
+       3 | index_tags   | 2026-10-16 02:09:08.077093
 (3 rows)
 ```
 
@@ -929,21 +801,29 @@ migrate: 4_add_notebooks.up.sql: relation "notebook" does not exist (SQLSTATE 42
 
 A server usually has a `pg.Pool`, not one connection. `postgres.driverPool(pool)` takes one
 connection from the pool for each call (`up`, `down`, `to`, `status`, `version`) and gives it
-back when the call ends, after a failure too. Only `main` changes:
+back when the call ends, after a failure too. Two lines of `main` change, the rest stays:
 
 ```ktm
-i32 main(i32 argc, u8 **argv) {
-    if (argc < 2 || !str.equals(cstr.view(argv[1]), "migrate")) {
-        usage();
-        return 2;
-    }
+import "github.com/ozzenerol/ktm-pg";
+import "github.com/ozzenerol/ktm-migrate";
+import "github.com/ozzenerol/ktm-migrate/postgres";
+import vec;
+
+i32 main() {
     try {
         pg.Pool *pool = pg.open();
         defer pool.close();
         migrate.Migrations ms = migrate.load("migrations");
         defer ms.free();
         migrate.Driver d = postgres.driverPool(pool);
-        return migrateCommand(&ms, &d, argc, argv);
+        i64 n = ms.up(&d);
+        printf("%d migration(s) applied, version %d\n", n, migrate.version(&d));
+
+        vec.Vec<migrate.Status> st = ms.status(&d);
+        defer st.free();
+        for (auto s : st) {
+            printf("%4d  %-8s %.*s\n", s.version, s.applied ? "applied" : "pending", s.name.len, s.name.ptr);
+        }
     } catch (Error e) {
         printf("%s\n", e.message);
         return 1;
@@ -968,13 +848,15 @@ both apply the same migration. Each driver has a lock for that:
 - Inside each migration's transaction, the runner checks again whether the migration is applied.
   A migration never runs twice.
 
-Two programs started together on one SQLite file, with a migration that takes a few seconds:
+Two copies of the start-up program from [Migrating at start-up](#migrating-at-start-up), started
+together on a new SQLite file, with a migration that takes a few seconds:
 
 ```sh
-$ ./notes migrate up & ./notes migrate up
-0 migration(s) applied, version 4
+$ ./notes & ./notes
 4 migration(s) applied, version 4
 ```
+
+One applied all four. The other waited for the lock, found nothing left, and printed nothing.
 
 On PostgreSQL there is a catch in ktm-migrate v0.1.1. When the pending migrations include a
 `CREATE INDEX CONCURRENTLY`, two instances that start together deadlock. `CREATE INDEX
@@ -986,8 +868,8 @@ deadlock detected (SQLSTATE 40P01); detail: Process 106 waits for ExclusiveLock 
 ```
 
 The first instance finishes the migrations. The failed one finds nothing to do when it starts
-again. Until this is fixed, deploy a concurrent index build with one instance, or run `migrate
-up` as a step of its own before the instances start.
+again. Until this is fixed, deploy a concurrent index build with one instance, or run the
+migrations as a step of their own before the instances start.
 
 ## Branches and merged migrations
 
@@ -1003,30 +885,36 @@ migrations/
 ```
 
 `up` applies every migration the database doesn't have, including one whose version is lower
-than the newest applied:
+than the newest applied. With the program from [See where a database is](#see-where-a-database-is),
+before and after the merge brings `create_b` in:
 
 ```sh
-$ ./notes migrate status
+$ ./notes
+2 migration(s) applied, version 20261003090000
 20261001090000  applied  create_a
-20261002090000  pending  create_b
 20261003090000  applied  create_c
-$ ./notes migrate up
+$ ./notes
 1 migration(s) applied, version 20261003090000
+20261001090000  applied  create_a
+20261002090000  applied  create_b
+20261003090000  applied  create_c
 ```
 
 The other way round, a database can have a version this build doesn't know, because a newer
-build ran it. `status` lists it with an empty name, and `down` refuses to go past it:
+build ran it. `status` lists it with an empty name:
 
 ```sh
-$ ./notes migrate status
+$ ./notes
+0 migration(s) applied, version 5
    1  applied  create_notes
    2  applied  create_tags
    3  applied  add_pinned
    4  applied  title_limit
    5  applied
-$ ./notes migrate down
-migrate: version 5 is applied, but there is no migration 5 here
 ```
+
+`down` and `to` refuse to go past it, with `migrate: version 5 is applied, but there is no
+migration 5 here`.
 
 `up` leaves such a version alone, so an older build still starts against a newer database.
 
@@ -1166,5 +1054,5 @@ for each pending migration, begin, check again, run the script, record it and co
   column from an old one), in the same transaction as the change that needs them.
 - **Keep `schema_migrations` to the runner.** Change it by hand only to repair a database, and
   then with the program stopped.
-- **Run migrations from one place:** at start-up or as a `migrate up` command before the new
-  build starts, not both on a schedule of their own.
+- **Run migrations from one place:** at start-up, or as a step of the deploy before the new build
+  starts. Not both.
