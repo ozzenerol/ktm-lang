@@ -4,16 +4,21 @@ import cstr, libc, mem, os;
 /* strings.ktm */
 
 /* Compiler reserves 256 bytes per CatchFrame. We split that into a
- * 240-byte jmp_buf storage region (setjmp owns the format; _setjmp
- * writes 192 bytes at most: macOS arm64), the thread state the frame was
- * pushed on, and the chain pointer the runtime walks. */
-const i64 __JMP_BUF_BYTES__ = 240;
+ * 232-byte jmp_buf storage region (setjmp owns the format; _setjmp
+ * writes 192 bytes at most: macOS arm64), whether a defer pushed it, the
+ * thread state the frame was pushed on, and the chain pointer the
+ * runtime walks. */
+const i64 __JMP_BUF_BYTES__ = 232;
+
+/* The return addresses an uncaught error's trace keeps */
+const i64 __TRACE_MAX__ = 64;
 
 pub struct CatchFrame;
 pub struct HCFs;
 
 pub struct CatchFrame {
     i8 jb[__JMP_BUF_BYTES__];
+    i64 isDefer;           /* a defer's (rethrows), not a try's (catches) */
     HCFs *fs;              /* its thread's state: leaving needs no Fs() */
     CatchFrame *prev;
 };
@@ -31,6 +36,8 @@ pub struct HCFs {
     u64 stackLo, stackHi;    /* the running coroutine's stack (coroutines.ktm) */
     u64 threadLo, threadHi;  /* the thread's own stack, 0 until looked up */
     u8 *crashStack;          /* the thread's signal stack (__ktmCrashThread) */
+    i64 traceN;              /* the calls of a throw only defers stand above, */
+    u64 traceRets[__TRACE_MAX__]; /* kept for its uncaught trace */
 };
 
 /* The "" of an Error without a message (or file): never freed. */
@@ -104,6 +111,16 @@ pub void __ktmPushFrame(CatchFrame *f) {
     HCFs *fs = Fs();
     f.prev = fs.catchTop;
     f.fs = fs;
+    f.isDefer = 0;
+    fs.catchTop = f;
+}
+
+/* The same for a defer's frame */
+pub void __ktmPushDefer(CatchFrame *f) {
+    HCFs *fs = Fs();
+    f.prev = fs.catchTop;
+    f.fs = fs;
+    f.isDefer = 1;
     fs.catchTop = f;
 }
 
@@ -138,9 +155,20 @@ static void WriteErr(u8 *s) {
  * by its name in the line records of libktm it is given, and hands it
  * the walker (__ktmCrashAdd). */
 static fn(u64 fp) void uncaughtTrace;
+/* A throw with only defers above it ends uncaught, after they ran over
+ * the stack it came from: its calls are kept when it is thrown and
+ * printed from there (both from rt.crash, as the walker is) */
+static fn(u64 fp, u64 *rets, i64 max) i64 uncaughtCapture;
+static fn(u64 *rets, i64 n) void uncaughtRets;
 
 pub void __ktmUncaughtTraceSet(fn(u64 fp) void trace) {
     uncaughtTrace = trace;
+}
+
+pub void __ktmUncaughtCaptureSet(fn(u64 fp, u64 *rets, i64 max) i64 capture,
+                                 fn(u64 *rets, i64 n) void print) {
+    uncaughtCapture = capture;
+    uncaughtRets = print;
 }
 
 /* The frame pointer of the function that calls it */
@@ -219,8 +247,23 @@ static void __ktmUncaught(HCFs *fs) {
         WriteErr(buf);
     }
     WriteErr("\n");
-    if (uncaughtTrace) { uncaughtTrace(rtFrame()); }
+    if (fs.traceN && uncaughtRets) { uncaughtRets(fs.traceRets, fs.traceN); }
+    else if (uncaughtTrace) { uncaughtTrace(rtFrame()); }
     os.exit(1);
+}
+
+/* A new throw: when no try stands above it, keep its calls for the
+ * uncaught trace, then jump */
+static void ErrThrow(HCFs *fs) {
+    fs.traceN = 0;
+    if (uncaughtCapture) {
+        bool caught = false;
+        for (CatchFrame *t = fs.catchTop; t; t = t.prev) {
+            if (!t.isDefer) { caught = true; break; }
+        }
+        if (!caught) { fs.traceN = uncaughtCapture(rtFrame(), fs.traceRets, __TRACE_MAX__); }
+    }
+    ErrJump(fs);
 }
 
 static void ErrJump(HCFs *fs) {
@@ -237,7 +280,7 @@ static void ErrJump(HCFs *fs) {
 pub void __ktmThrowAt(u64 code, u8 *file, i64 line) {
     HCFs *fs = Fs();
     ErrSet(fs, code, null, file, line);
-    ErrJump(fs);
+    ErrThrow(fs);
 }
 
 /* `throw(code, fmt, ...)`: the compiler checks the call as one to
@@ -246,14 +289,14 @@ pub void __ktmThrowFmtAt(u8 *file, i64 line, u64 code, u8 *fmt, ...args) {
     u8 *message = cstr.formatArgs(null, fmt, args);
     HCFs *fs = Fs();
     ErrSet(fs, code, message, file, line);
-    ErrJump(fs);
+    ErrThrow(fs);
 }
 
 pub void __ktmThrowFmt(u64 code, u8 *fmt, ...args) {
     u8 *message = cstr.formatArgs(null, fmt, args);
     HCFs *fs = Fs();
     ErrSet(fs, code, message, null, 0);
-    ErrJump(fs);
+    ErrThrow(fs);
 }
 
 /* `throw(e)`: the same error again, with a copy of its message (the
@@ -262,7 +305,7 @@ pub void __ktmThrowError(Error *e) {
     u8 *message = ErrOwns(e.message) ? cstr.dup(e.message) : null;
     HCFs *fs = Fs();
     ErrSet(fs, e.code, message, e.file, e.line);
-    ErrJump(fs);
+    ErrThrow(fs);
 }
 
 /* A failed bounds check (the compiler calls these): `s[i]` with i not
@@ -271,14 +314,14 @@ pub void __ktmBoundsIndex(i64 index, i64 len, u8 *file, i64 line) {
     HCFs *fs = Fs();
     ErrSet(fs, ERR_BOUNDS, cstr.format("index %d out of range for length %d", index, len),
            file, line);
-    ErrJump(fs);
+    ErrThrow(fs);
 }
 
 pub void __ktmBoundsSlice(i64 lo, i64 hi, i64 len, u8 *file, i64 line) {
     HCFs *fs = Fs();
     ErrSet(fs, ERR_BOUNDS, cstr.format("slice %d:%d out of range for length %d", lo, hi, len),
            file, line);
-    ErrJump(fs);
+    ErrThrow(fs);
 }
 
 /* ---- stack limits ----

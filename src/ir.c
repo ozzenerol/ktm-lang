@@ -3082,7 +3082,7 @@ static void irLowerDefer(IrCtx *ctx, Ast *ast) {
                                     irConstInt(IR_TYPE_I64, saved_size), NULL));
     irAddStackSpace(ctx, saved_size);
 
-    irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmPushFrame"), IR_TYPE_VOID, 8, frame_addr);
+    irEmitRuntimeCall1(ctx, astRuntimeSymbol("__ktmPushDefer"), IR_TYPE_VOID, 8, frame_addr);
     IrValue *enter_ret = irEmitRuntimeCall1(ctx, irSetjmpName(ctx),
                                             IR_TYPE_I64, 8, frame_addr);
 
