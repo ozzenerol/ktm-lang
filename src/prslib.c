@@ -470,6 +470,8 @@ Ast *parseFunctionPointer(Cctrl *cc, AstType *rettype) {
     return ast;
 }
 
+static int parseDefaultCompat(AstType *param, Ast *arg);
+
 Ast *parseDefaultFunctionParam(Cctrl *cc, Ast *var) {
     if (var->type->kind == AST_TYPE_ARRAY) {
         cctrlRaiseException(cc,"Cannot have a default value of type array");
@@ -496,6 +498,26 @@ Ast *parseDefaultFunctionParam(Cctrl *cc, Ast *var) {
             converted->slice_var = gvar;
         }
         init = converted;
+    }
+    /* the default must fit the parameter as an argument would: a call
+     * that leaves it out gets it as it is */
+    int compat = init && var->kind == AST_LVAR ? parseDefaultCompat(var->type, init) : 0;
+    if (compat) {
+        char *want = astTypeToString(var->type);
+        char *got = astTypeToString(init->type);
+        char *hint = "";
+        if (var->type->kind == AST_TYPE_CLASS && var->type->clsname &&
+            !strcmp(var->type->clsname->data, "String") &&
+            init->type->kind == AST_TYPE_ARRAY) {
+            hint = ": take a `u8[]` parameter, which a literal can be, and str.from it where a String is needed";
+        }
+        if (compat == 2) {
+            cctrlRaiseException(cc, "default value of parameter `%s` is a `%s`, not a `%s`%s",
+                    var->lname->data, got, want, hint);
+        } else {
+            cctrlWarning(cc, "default value of parameter `%s` is a `%s`, not a `%s`",
+                    var->lname->data, got, want);
+        }
     }
     return astFunctionDefaultParam(var,init);
 }
@@ -1287,6 +1309,14 @@ static ParseArgCompat parseArgCompat(AstType *param, Ast *arg) {
         }
     }
     return ARG_OK;
+}
+
+/* 0: a default value fits its parameter, 1: it would warn as an argument,
+ * 2: it is refused */
+static int parseDefaultCompat(AstType *param, Ast *arg) {
+    ParseArgCompat c = parseArgCompat(param, arg);
+    if (c == ARG_OK) return 0;
+    return c == ARG_ERROR || c == ARG_FN_MISMATCH ? 2 : 1;
 }
 
 /* Warn about (or reject) argument i of a call, per parseArgCompat */

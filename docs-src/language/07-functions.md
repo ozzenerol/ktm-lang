@@ -332,6 +332,40 @@ example.com:8080
 
 Repeating a default with the same value is fine; a different value is an error.
 
+A default must fit its parameter as an argument would. A literal is text, not a `String`, so a
+`String` parameter can't default to one. Take a `u8[]`, which a literal can be:
+
+```ktm error
+void openHistory(String path = ".history") {
+}
+
+i32 main() {
+    openHistory();
+    return 0;
+}
+```
+
+```output
+default value of parameter `path` is a `u8[9]`, not a `String`
+```
+
+```ktm run
+void openHistory(u8[] path = ".history") {
+    printf("history in %.*s\n", path.len, path.ptr);
+}
+
+i32 main() {
+    openHistory();
+    openHistory("/tmp/h");
+    return 0;
+}
+```
+
+```output
+history in .history
+history in /tmp/h
+```
+
 ## Where a call comes from
 
 A parameter marked `@caller("file")`, `@caller("line")` or `@caller("func")` is filled in at every

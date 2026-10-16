@@ -249,6 +249,26 @@ c gets id 102</code></pre>
 <pre class="out"><code>example.com:80
 example.com:8080</code></pre>
 <p>Repeating a default with the same value is fine; a different value is an error.</p>
+<p>A default must fit its parameter as an argument would. A literal is text, not a <code>String</code>, so a <code>String</code> parameter can't default to one. Take a <code>u8[]</code>, which a literal can be:</p>
+<pre class="code bad"><span class="tag">does not compile</span><code><span class="t">void</span> openHistory(<span class="t">String</span> path = <span class="s">&quot;.history&quot;</span>) {
+}
+
+<span class="t">i32</span> main() {
+    openHistory();
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>default value of parameter `path` is a `u8[9]`, not a `String`</code></pre>
+<pre class="code run"><code><span class="t">void</span> openHistory(<span class="t">u8</span>[] path = <span class="s">&quot;.history&quot;</span>) {
+    printf(<span class="s">&quot;history in %.*s\n&quot;</span>, path.len, path.ptr);
+}
+
+<span class="t">i32</span> main() {
+    openHistory();
+    openHistory(<span class="s">&quot;/tmp/h&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>history in .history
+history in /tmp/h</code></pre>
 <h2 id="where-a-call-comes-from"><a href="#where-a-call-comes-from">Where a call comes from</a></h2>
 <p>A parameter marked <code>@caller(&quot;file&quot;)</code>, <code>@caller(&quot;line&quot;)</code> or <code>@caller(&quot;func&quot;)</code> is filled in at every call with where that call is written. Callers never pass it. A logging or checking function can then say where it was called from.</p>
 <pre class="code run"><code><span class="t">void</span> trace(<span class="a">@caller</span>(<span class="s">&quot;file&quot;</span>) <span class="t">u8</span> *file, <span class="a">@caller</span>(<span class="s">&quot;line&quot;</span>) <span class="t">i64</span> line,
