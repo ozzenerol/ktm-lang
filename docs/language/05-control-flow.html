@@ -249,7 +249,7 @@ k = 3</code></pre>
 <pre class="out"><code>nums[1] + nums[3] = 12</code></pre>
 <h2 id="the-range-based-for"><a href="#the-range-based-for">The range-based for</a></h2>
 <p><code>for (T x : items)</code> runs once per element, in order. It works on:</p>
-<ul><li>fixed-size arrays,</li><li>slices (<code>T[]</code>), <code>String</code>s included,</li><li>any struct with <code>data</code> and <code>len</code> fields (or <code>entries</code> and <code>size</code>), such as <a href="../std/index.html#vec/vec.Vec">vec.Vec</a>.</li></ul>
+<ul><li>fixed-size arrays,</li><li>slices (<code>T[]</code>), <code>String</code>s included,</li><li>any struct with <code>data</code> and <code>len</code> fields (or <code>entries</code> and <code>size</code>), such as <a href="../std/index.html#vec/vec.Vec">vec.Vec</a>,</li><li>a <a href="../std/index.html#map/map.Map">map.Map</a>: each entry, in the order the keys were added.</li></ul>
 <pre class="code run"><code><span class="k">import</span> vec;
 
 <span class="t">void</span> main() {
@@ -278,6 +278,22 @@ k = 3</code></pre>
 <pre class="out"><code>sum = 28
 [k][t][m]
 1.5 2.5 </code></pre>
+<p>Over a map, the loop variable is an entry, with the key in <code>.key</code> and the value in <code>.value</code>. Deleted keys are skipped:</p>
+<pre class="code run"><code><span class="k">import</span> map;
+
+<span class="t">void</span> main() {
+    map.Map&lt;<span class="t">u8</span>[], <span class="t">i64</span>&gt; stock = map.new&lt;<span class="t">u8</span>[], <span class="t">i64</span>&gt;();
+    stock.set(<span class="s">&quot;apples&quot;</span>, <span class="n">12</span>);
+    stock.set(<span class="s">&quot;pears&quot;</span>, <span class="n">0</span>);
+    stock.set(<span class="s">&quot;plums&quot;</span>, <span class="n">7</span>);
+    stock.delete(<span class="s">&quot;pears&quot;</span>);
+    <span class="k">for</span> (<span class="k">auto</span> e : stock) {
+        printf(<span class="s">&quot;%.*s: %d\n&quot;</span>, e.key.len, e.key.ptr, e.value);
+    }
+    stock.free();
+}</code></pre>
+<pre class="out"><code>apples: 12
+plums: 7</code></pre>
 <p>The loop variable is a copy of the element. Changing it changes nothing in the array; to change the elements, loop over the index:</p>
 <pre class="code run"><code><span class="t">void</span> main() {
     <span class="t">i64</span> nums[] = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>};

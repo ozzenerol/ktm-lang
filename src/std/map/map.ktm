@@ -3,7 +3,8 @@ import libc, mem, str, vec;
 
 /* A hash map from K to V, held by value (like String): make one with
  * map.new<K, V>(), free it with free() (or declare it `scoped`).
- * Iteration (next, keys, values) goes in insertion order. Keys are
+ * Iteration (`for (auto e : m)` with e.key and e.value, next, keys,
+ * values) goes in insertion order. Keys are
  * hashed with map.hashOf and compared with map.keyEq: i64, u64, i32,
  * u32, any pointer, u8[] and String have their own; any other type is
  * hashed and compared by its bytes (initialise a struct key fully). A
