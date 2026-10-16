@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Terminal output - ktm</title>
-<meta name="description" content="Make a command-line program&#x27;s output easy to read with the standard library&#x27;s term module: colors, lines that say what happened, tables whose columns line up, and a progress bar. This guide shows each one, then puts them together in a small report. Every step is a whole program you can build and run.">
+<meta name="description" content="Make a command-line program&#x27;s output easy to read with the standard library&#x27;s term module: colors, lines that say what happened, tables whose columns line up, and a progress bar. Then read what people type, with line editing and a history, as GNU readline does. This guide shows each one, then puts them together in a small report. Every step is a whole program you can build and run.">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="../assets/style.css">
 <script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
@@ -32,9 +32,9 @@
   <aside class="chapters" aria-label="Chapters"><h4>Quick Guides</h4><ol><li><a href="01-database-migrations.html"><span class="num">1</span>Database migrations</a></li><li><a href="02-logging.html"><span class="num">2</span>Logging</a></li><li><a href="03-sqlite.html"><span class="num">3</span>SQLite</a></li><li><a href="04-postgresql.html"><span class="num">4</span>PostgreSQL</a></li><li><a href="05-flags.html"><span class="num">5</span>Command-line flags</a></li><li><a href="06-terminal-output.html" class="on"><span class="num">6</span>Terminal output</a></li></ol></aside>
   <article class="prose">
 <h1>Terminal output</h1>
-<p class="lede">Make a command-line program's output easy to read with the standard library's <code>term</code> module: colors, lines that say what happened, tables whose columns line up, and a progress bar. This guide shows each one, then puts them together in a small report. Every step is a whole program you can build and run.</p>
+<p class="lede">Make a command-line program's output easy to read with the standard library's <code>term</code> module: colors, lines that say what happened, tables whose columns line up, and a progress bar. Then read what people type, with line editing and a history, as GNU readline does. This guide shows each one, then puts them together in a small report. Every step is a whole program you can build and run.</p>
 <h2 id="what-you-need"><a href="#what-you-need">What you need</a></h2>
-<p>Any ktm from v0.27.0. <code>term</code> is part of the standard library, so there is nothing to fetch. Every program in this guide is one file, <code>app.ktm</code>, built and run like this:</p>
+<p>Any ktm from v0.27.0, and v0.28.0 for <a href="#reading-what-people-type">reading what people type</a>. <code>term</code> is part of the standard library, so there is nothing to fetch. Every program in this guide is one file, <code>app.ktm</code>, built and run like this:</p>
 <pre class="code"><code>ktm app.ktm -o app
 ./app</code></pre>
 <p>Run the programs in a terminal to see the colors. The outputs below are what a pipe or a file gets: the same text, without colors. The next section but one says why.</p>
@@ -193,6 +193,90 @@ copying  ███████████████████████�
 <pre class="code"><code>copying  ███████████████░░░░░░░░░░░░░░░   50%  120/240</code></pre>
 <p>At <code>p.done()</code> it is drawn full, with the time the work took, and the program goes on below it.</p>
 <ul><li>The bar goes to stderr, like the warnings, so stdout stays for the program's real output.</li><li>It is redrawn when its percent changes, or after 100 ms, so a loop of a million steps costs about a hundred redraws, not a million.</li><li>Lines written with <code>term.print</code>, <code>term.info</code> and the others while the bar runs go above it, and the bar is drawn again under them.</li><li>In a pipe or a file there is nothing to redraw, so only the last line is written, at <code>p.done()</code>. That is why it comes after the <code>✓</code> line above: stdout and stderr are two streams, and this page shows stdout first.</li><li><code>p.add(n)</code> adds <code>n</code> steps, and <code>p.set(n)</code> says how many are done in all.</li></ul>
+<h2 id="reading-what-people-type"><a href="#reading-what-people-type">Reading what people type</a></h2>
+<p><code>term.readLine</code> shows a prompt and reads one line. On a terminal, the line can be edited with the keys of a shell, and Up and Down go through the lines typed before. It answers <code>false</code> when the input ends, so a loop over it is a whole interactive program. This one keeps a to-do list:</p>
+<pre class="code"><code><span class="k">import</span> str, term, vec;
+
+<span class="t">i32</span> main() {
+    term.historyFile(<span class="s">&quot;.todo_history&quot;</span>);
+    <span class="k">scoped</span> vec.Vec&lt;<span class="t">String</span>&gt; todos = vec.new&lt;<span class="t">String</span>&gt;();
+    term.print(<span class="s">&quot;[bold]todo[/]: add &lt;text&gt;, done &lt;n&gt;, list, clear, exit\n&quot;</span>);
+
+    <span class="k">scoped</span> <span class="t">String</span> line;
+    <span class="k">while</span> (term.readLine(<span class="s">&quot;[cyan]todo&gt;[/] &quot;</span>, &amp;line)) {
+        <span class="t">u8</span>[] cmd = str.trim(line[<span class="n">0</span>:]);
+        <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;exit&quot;</span>)) {
+            <span class="k">break</span>;
+        } <span class="k">else</span> <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;clear&quot;</span>)) {
+            term.clear();
+        } <span class="k">else</span> <span class="k">if</span> (str.startsWith(cmd, <span class="s">&quot;add &quot;</span>)) {
+            todos.push(str.from(str.trim(cmd[<span class="n">4</span>:])));
+            term.success(<span class="s">&quot;added #%d&quot;</span>, todos.len);
+        } <span class="k">else</span> <span class="k">if</span> (str.startsWith(cmd, <span class="s">&quot;done &quot;</span>)) {
+            <span class="t">i64</span> n;
+            <span class="k">if</span> (!str.toInt(str.trim(cmd[<span class="n">5</span>:]), &amp;n) || n &lt; <span class="n">1</span> || n &gt; todos.len) {
+                term.error(<span class="s">&quot;no todo %.*s&quot;</span>, cmd.len - <span class="n">5</span>, cmd.ptr + <span class="n">5</span>);
+                <span class="k">continue</span>;
+            }
+            <span class="t">String</span> gone = todos.removeAt(n - <span class="n">1</span>);
+            term.success(<span class="s">&quot;done: %.*s&quot;</span>, gone.len, gone.ptr);
+            gone.free();
+        } <span class="k">else</span> <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;list&quot;</span>)) {
+            term.Table *t = term.table(<span class="s">&quot;#&quot;</span>, <span class="s">&quot;TODO&quot;</span>);
+            <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; todos.len; i++) {
+                t.row(i + <span class="n">1</span>, todos.data[i]);
+            }
+            t.print();
+            t.free();
+        } <span class="k">else</span> <span class="k">if</span> (cmd.len) {
+            term.error(<span class="s">&quot;unknown command: %.*s&quot;</span>, cmd.len, cmd.ptr);
+        }
+    }
+    term.print(<span class="s">&quot;bye\n&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm app.ktm -o app
+./app</code></pre>
+<p>A session, with what was typed after each <code>todo&gt;</code>:</p>
+<pre class="out"><code>todo: add &lt;text&gt;, done &lt;n&gt;, list, clear, exit
+todo&gt; add buy milk
+✓ added #1
+todo&gt; add call the bank
+✓ added #2
+todo&gt; list
+#  TODO
+1  buy milk
+2  call the bank
+todo&gt; done 1
+✓ done: buy milk
+todo&gt; done 9
+✗ no todo 9
+todo&gt; frobnicate
+✗ unknown command: frobnicate
+todo&gt; exit
+bye</code></pre>
+<ul><li><code>term.readLine(prompt, &amp;line)</code> puts the line in <code>line</code>, without its newline, and replaces what <code>line</code> held: one <code>scoped String</code> serves the whole loop.</li><li>It answers <code>false</code> when the input ends: Ctrl-D on an empty line, or the end of a pipe. Typing <code>exit</code> is the program's own command, as here.</li><li>The prompt can hold markup, like everything <code>term</code> prints.</li><li>Every line read goes into the history, except empty ones and a line the same as the one before.</li><li><code>term.historyFile(path)</code> reads the lines saved there by earlier runs and appends each new one, so Up brings back yesterday's commands too. Without it the history lasts as long as the program.</li><li><code>term.clear()</code> clears the screen. Ctrl-L does the same while a line is typed.</li><li>When stdin isn't a terminal, the lines are read as they come, with nothing to edit. The same program runs a script: <code>printf &#x27;add milk\nlist\n&#x27; | ./app</code>.</li></ul>
+<p>The keys, as in bash and GNU readline:</p>
+<div class="table"><table><thead><tr><th>Keys</th><th>What they do</th></tr></thead><tbody><tr><td>Left, Right (Ctrl-B, Ctrl-F)</td><td>move one character</td></tr><tr><td>Ctrl-Left, Ctrl-Right (Alt-B, Alt-F)</td><td>move one word</td></tr><tr><td>Home, End (Ctrl-A, Ctrl-E)</td><td>go to the start or the end</td></tr><tr><td>Backspace, Delete</td><td>delete the character before or under the cursor</td></tr><tr><td>Ctrl-W, Alt-Backspace</td><td>delete the word before the cursor</td></tr><tr><td>Ctrl-U, Ctrl-K</td><td>delete everything before or after the cursor</td></tr><tr><td>Up, Down (Ctrl-P, Ctrl-N)</td><td>the line before or after in the history</td></tr><tr><td>Ctrl-L</td><td>clear the screen</td></tr><tr><td>Ctrl-C</td><td>drop the line and ask again</td></tr><tr><td>Ctrl-D</td><td>end the input on an empty line; delete the character under the cursor otherwise</td></tr><tr><td>Enter</td><td>the line is done</td></tr></tbody></table></div>
+<p>A line longer than the terminal scrolls sideways under the cursor.</p>
+<h3 id="passwords-and-the-history-by-hand"><a href="#passwords-and-the-history-by-hand">Passwords and the history by hand</a></h3>
+<p><code>term.readPassword</code> reads a line without showing it, and never puts it in the history:</p>
+<pre class="code"><code><span class="k">import</span> term;
+
+<span class="t">i32</span> main() {
+    <span class="k">scoped</span> <span class="t">String</span> user;
+    <span class="k">scoped</span> <span class="t">String</span> pass;
+    <span class="k">if</span> (!term.readLine(<span class="s">&quot;user: &quot;</span>, &amp;user) || !term.readPassword(<span class="s">&quot;password: &quot;</span>, &amp;pass)) {
+        <span class="k">return</span> <span class="n">1</span>;
+    }
+    term.success(<span class="s">&quot;%.*s, your password has %d characters&quot;</span>, user.len, user.ptr, pass.len);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="out"><code>user: ada
+password:
+✓ ada, your password has 9 characters</code></pre>
+<ul><li>Nothing appears while the password is typed, not even stars. Backspace and Ctrl-U work.</li><li>Ctrl-C or Ctrl-D makes it answer <code>false</code>, so the program can stop.</li></ul>
+<p><code>term.historyAuto(false)</code> stops <code>readLine</code> from adding lines; <code>term.historyAdd(line)</code> then adds the ones you choose, such as the commands that worked. <code>term.historyMax(n)</code> keeps the last <code>n</code> lines (1000 at first), <code>term.historyLen()</code> and <code>term.historyAt(i)</code> read them, oldest first, and <code>term.historyClear()</code> empties the history in memory.</p>
 <h2 id="putting-it-together"><a href="#putting-it-together">Putting it together</a></h2>
 <p>A program that checks a few services and reports on them, with each part of <code>term</code> where it fits:</p>
 <pre class="code run"><code><span class="k">import</span> term;
@@ -260,13 +344,13 @@ checking  ███████████████████████�
 ✗ 1 service is down</code></pre>
 <ul><li>The <code>MS</code> column holds a <code>-</code> for the service that didn't answer. That makes it a text column, which would line up on the left, so <code>t.align(3, term.Align.right)</code> keeps it on the right.</li><li>The program ends with exit code 1 when a service is down, so a script or a CI job can tell.</li></ul>
 <h2 id="reference"><a href="#reference">Reference</a></h2>
-<div class="table"><table><thead><tr><th>Call</th><th>What it does</th></tr></thead><tbody><tr><td><code>term.print(fmt, ...)</code></td><td><code>printf</code> to stdout, with markup in <code>fmt</code></td></tr><tr><td><code>term.eprint(fmt, ...)</code></td><td>the same, to stderr</td></tr><tr><td><code>term.format(fmt, ...)</code></td><td>the same, into a new <code>String</code> (colors as stdout has them)</td></tr><tr><td><code>term.success</code>, <code>term.info</code></td><td>one line on stdout after a green <code>✓</code> or a blue <code>•</code></td></tr><tr><td><code>term.warn</code>, <code>term.error</code></td><td>one line on stderr after a yellow <code>!</code> or a red <code>✗</code></td></tr><tr><td><code>term.title(fmt, ...)</code></td><td>one bold line on stdout</td></tr><tr><td><code>term.colors()</code></td><td>does stdout get colors?</td></tr><tr><td><code>term.setColors(on)</code></td><td>colors on or off for stdout and stderr, whatever they are</td></tr><tr><td><code>term.width(text)</code></td><td>the columns <code>text</code> takes on a terminal, without its markup</td></tr><tr><td><code>term.table(headers...)</code></td><td>a new table; no headers for a table without a header line</td></tr><tr><td><code>t.row(cells...)</code></td><td>one row: text, numbers, bools, enums or Strings</td></tr><tr><td><code>t.align(col, a)</code></td><td><code>term.Align.left</code>, <code>right</code> or <code>center</code> for column <code>col</code> (from 0)</td></tr><tr><td><code>t.border</code></td><td><code>term.Border.none</code>, <code>box</code> or <code>markdown</code></td></tr><tr><td><code>t.print()</code></td><td>writes the table to stdout</td></tr><tr><td><code>t.format(colors)</code></td><td>the table as a new <code>String</code>; <code>colors</code> is <code>false</code> when left out</td></tr><tr><td><code>t.rows()</code>, <code>t.free()</code></td><td>how many rows; frees the table</td></tr><tr><td><code>term.progress(label, total)</code></td><td>a progress bar on stderr</td></tr><tr><td><code>p.add(n)</code>, <code>p.set(n)</code></td><td><code>n</code> more steps done (1 when left out); <code>n</code> steps done in all</td></tr><tr><td><code>p.done()</code></td><td>the last line, with the time taken; frees the bar</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>Call</th><th>What it does</th></tr></thead><tbody><tr><td><code>term.print(fmt, ...)</code></td><td><code>printf</code> to stdout, with markup in <code>fmt</code></td></tr><tr><td><code>term.eprint(fmt, ...)</code></td><td>the same, to stderr</td></tr><tr><td><code>term.format(fmt, ...)</code></td><td>the same, into a new <code>String</code> (colors as stdout has them)</td></tr><tr><td><code>term.success</code>, <code>term.info</code></td><td>one line on stdout after a green <code>✓</code> or a blue <code>•</code></td></tr><tr><td><code>term.warn</code>, <code>term.error</code></td><td>one line on stderr after a yellow <code>!</code> or a red <code>✗</code></td></tr><tr><td><code>term.title(fmt, ...)</code></td><td>one bold line on stdout</td></tr><tr><td><code>term.colors()</code></td><td>does stdout get colors?</td></tr><tr><td><code>term.setColors(on)</code></td><td>colors on or off for stdout and stderr, whatever they are</td></tr><tr><td><code>term.width(text)</code></td><td>the columns <code>text</code> takes on a terminal, without its markup</td></tr><tr><td><code>term.table(headers...)</code></td><td>a new table; no headers for a table without a header line</td></tr><tr><td><code>t.row(cells...)</code></td><td>one row: text, numbers, bools, enums or Strings</td></tr><tr><td><code>t.align(col, a)</code></td><td><code>term.Align.left</code>, <code>right</code> or <code>center</code> for column <code>col</code> (from 0)</td></tr><tr><td><code>t.border</code></td><td><code>term.Border.none</code>, <code>box</code> or <code>markdown</code></td></tr><tr><td><code>t.print()</code></td><td>writes the table to stdout</td></tr><tr><td><code>t.format(colors)</code></td><td>the table as a new <code>String</code>; <code>colors</code> is <code>false</code> when left out</td></tr><tr><td><code>t.rows()</code>, <code>t.free()</code></td><td>how many rows; frees the table</td></tr><tr><td><code>term.readLine(prompt, &amp;line)</code></td><td>reads a line, with editing and the history on a terminal; <code>false</code> at the end</td></tr><tr><td><code>term.readPassword(prompt, &amp;line)</code></td><td>reads a line without showing it, not into the history</td></tr><tr><td><code>term.clear()</code></td><td>clears the terminal</td></tr><tr><td><code>term.historyFile(path)</code></td><td>reads the history from a file and appends new lines to it</td></tr><tr><td><code>term.historyAdd(line)</code>, <code>term.historyAuto(on)</code></td><td>add a line by hand; whether <code>readLine</code> adds them</td></tr><tr><td><code>term.historyMax(n)</code>, <code>term.historyLen()</code>, <code>term.historyAt(i)</code>, <code>term.historyClear()</code></td><td>the history's size and lines</td></tr><tr><td><code>term.progress(label, total)</code></td><td>a progress bar on stderr</td></tr><tr><td><code>p.add(n)</code>, <code>p.set(n)</code></td><td><code>n</code> more steps done (1 when left out); <code>n</code> steps done in all</td></tr><tr><td><code>p.done()</code></td><td>the last line, with the time taken; frees the bar</td></tr></tbody></table></div>
 <p>The whole module is in the <a href="../std/#term.print">library reference</a>.</p>
 <h2 id="rules-of-thumb"><a href="#rules-of-thumb">Rules of thumb</a></h2>
 <ul><li><strong>Color a word, not a line.</strong> <code>[red]failed[/] 2 tests</code> is easier to read than a whole red line.</li><li><strong>Give each color one meaning</strong> and keep it: green for done, yellow for a warning, red for an error. Color only adds to the text: <code>failed</code> still has to say it, for the people and the files that don't see the color.</li><li><strong>Results to stdout, everything about them to stderr.</strong> The <code>term</code> calls already do this: tables and <code>success</code> lines are output, warnings, errors and the progress bar are not.</li><li><strong>Never force colors on.</strong> Leave the choice to <code>term</code> and the user's <code>NO_COLOR</code>, unless the user asked for colors with a flag.</li><li><strong>Put numbers in a table as numbers</strong>, not as text, so they line up on the right.</li></ul>
     <nav class="pager"><a class="prev" href="05-flags.html"><span>Previous</span>Command-line flags</a></nav>
   </article>
-  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#what-you-need">What you need</a></li><li><a href="#colors">Colors</a></li><li><a href="#lines-that-say-what-happened">Lines that say what happened</a></li><li><a href="#when-there-are-no-colors">When there are no colors</a></li><li><a href="#tables">Tables</a></li><li><a href="#a-progress-bar">A progress bar</a></li><li><a href="#putting-it-together">Putting it together</a></li><li><a href="#reference">Reference</a></li><li><a href="#rules-of-thumb">Rules of thumb</a></li></ul></aside>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#what-you-need">What you need</a></li><li><a href="#colors">Colors</a></li><li><a href="#lines-that-say-what-happened">Lines that say what happened</a></li><li><a href="#when-there-are-no-colors">When there are no colors</a></li><li><a href="#tables">Tables</a></li><li><a href="#a-progress-bar">A progress bar</a></li><li><a href="#reading-what-people-type">Reading what people type</a></li><li><a href="#putting-it-together">Putting it together</a></li><li><a href="#reference">Reference</a></li><li><a href="#rules-of-thumb">Rules of thumb</a></li></ul></aside>
 </div>
 <footer>
   <div class="bar">
