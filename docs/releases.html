@@ -29,7 +29,7 @@
       <kbd>/</kbd>
       <ul id="site-results" class="results" hidden></ul>
     </div>
-    <span class="ver">v0.28.0</span>
+    <span class="ver">v0.28.1</span>
     <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
   </div>
 </header>
@@ -38,6 +38,21 @@
 <p class="lede">What changed in each version of ktm. Binaries for Linux x86_64, Linux arm64 and
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
+
+<h2>v0.28.1 <small>(2026-10-16)</small></h2>
+<p>Two fixes found by a program built on <code>term.readLine</code>.</p>
+
+<h3>Fixes</h3>
+<ul>
+  <li>A parameter's default value is checked against its type, as an argument is. A literal for a
+  <code>String</code> parameter (<code>String path = ".history"</code>) compiled and handed the function
+  a String of garbage, which crashed later in whatever used it; it is an error now that says to take a
+  <code>u8[]</code>. A default that would only warn as an argument (an integer for a pointer) warns.</li>
+  <li>An uncaught error that passed through a <code>defer</code> is traced from where it was thrown. The
+  trace began at the function whose defer ran, and the calls below it were missing: an error deep in a
+  package showed up as a line of <code>main</code>. A <code>throw(e)</code> from a catch is shown at its
+  own line, not at the catch's closing brace.</li>
+</ul>
 
 <h2>v0.28.0 <small>(2026-10-16)</small></h2>
 <p>Reading what people type, with line editing and a history, as GNU readline does.</p>
@@ -1712,7 +1727,7 @@ only names are new.</p>
 </main>
 <footer>
   <div class="bar">
-    <span>ktm v0.28.0</span>
+    <span>ktm v0.28.1</span>
     <a href="releases.html">Releases</a>
     <a href="known-issues.html">Known issues</a>
     <a href="roadmap.html">Roadmap</a>
