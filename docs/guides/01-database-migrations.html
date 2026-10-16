@@ -32,7 +32,7 @@
   <aside class="chapters" aria-label="Chapters"><h4>Quick Guides</h4><ol><li><a href="01-database-migrations.html" class="on"><span class="num">1</span>Database migrations</a></li></ol></aside>
   <article class="prose">
 <h1>Database migrations</h1>
-<p>Keep a database's schema in numbered SQL files and let your program bring any database up to date with <a href="https://github.com/ozzenerol/ktm-migrate">ktm-migrate</a>. This guide builds a small notes program on SQLite, step by step: the first migrations, a <code>migrate</code> command, migrating at start-up, changes SQLite can't make with <code>ALTER TABLE</code>, failures, tests and migrations built into the binary. Then the same program on PostgreSQL, several instances starting at once, migrations from merged branches, and a driver of your own.</p>
+<p>Keep a database's schema in numbered SQL files and let your program bring any database up to date with <a href="https://github.com/ozzenerol/ktm-migrate">ktm-migrate</a>. This guide builds a small notes program on SQLite, step by step: the first migrations, status, going back, migrating at start-up, changes SQLite can't make with <code>ALTER TABLE</code>, failures, tests and migrations built into the binary. Then the same program on PostgreSQL, several instances starting at once, migrations from merged branches, and a driver of your own.</p>
 <h2 id="what-you-need"><a href="#what-you-need">What you need</a></h2>
 <ul><li><strong>ktm 0.24 or newer.</strong> ktm-migrate v0.1.1 needs it.</li><li><strong>For SQLite, a ktm built with SQLite.</strong> The <code>sql</code> module, which the SQLite driver uses, is only in a ktm built from source with <code>--sqlite</code>. The release zips don't have it. You need sqlite3 and its headers (<code>libsqlite3-dev</code> on Debian and Ubuntu; macOS has them):</li></ul>
 <pre class="code"><code>$ git clone https://github.com/ozzenerol/ktm-lang &amp;&amp; cd ktm-lang
@@ -121,59 +121,13 @@ $ ./notes
 <pre class="code"><code>$ sqlite3 notes.db &#x27;SELECT * FROM schema_migrations&#x27;
 1|create_notes|2026-10-16 01:58:02
 2|create_tags|2026-10-16 01:58:02</code></pre>
-<h2 id="a-migrate-command"><a href="#a-migrate-command">A migrate command</a></h2>
-<p>A real program needs more than <code>up</code>. It needs a way to see where a database is, to undo the last change while developing, and to move to a given version. Here is the whole <code>main.ktm</code>, with a <code>migrate</code> command for all of that:</p>
+<h2 id="see-where-a-database-is"><a href="#see-where-a-database-is">See where a database is</a></h2>
+<p><code>ms.status(&amp;d)</code> lists every migration and whether the database has it. This <code>main.ktm</code> applies what is pending, then prints the list:</p>
 <pre class="code"><code><span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-migrate&quot;</span>;
 <span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-migrate/sqlite&quot;</span>;
-<span class="k">import</span> cstr, sql, str, vec;
+<span class="k">import</span> sql, vec;
 
-<span class="t">void</span> usage() {
-    printf(<span class="s">&quot;usage: notes migrate up | down [n] | to &lt;version&gt; | status | version\n&quot;</span>);
-}
-
-<span class="c">/* arg as a whole number, or -1 */</span>
-<span class="t">i64</span> number(<span class="t">u8</span> *arg) {
-    <span class="t">i64</span> n;
-    <span class="k">if</span> (!str.toInt(cstr.view(arg), &amp;n) || n &lt; <span class="n">0</span>) { <span class="k">return</span> -<span class="n">1</span>; }
-    <span class="k">return</span> n;
-}
-
-<span class="t">i32</span> migrateCommand(migrate.Migrations *ms, migrate.Driver *d, <span class="t">i32</span> argc, <span class="t">u8</span> **argv) {
-    <span class="t">u8</span>[] cmd = argc &gt; <span class="n">2</span> ? cstr.view(argv[<span class="n">2</span>]) : <span class="s">&quot;&quot;</span>;
-    <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;up&quot;</span>)) {
-        <span class="t">i64</span> n = ms.up(d);
-        printf(<span class="s">&quot;%d migration(s) applied, version %d\n&quot;</span>, n, migrate.version(d));
-    } <span class="k">else</span> <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;down&quot;</span>)) {
-        <span class="t">i64</span> n = argc &gt; <span class="n">3</span> ? number(argv[<span class="n">3</span>]) : <span class="n">1</span>;
-        <span class="k">if</span> (n &lt; <span class="n">1</span>) { usage(); <span class="k">return</span> <span class="n">2</span>; }
-        <span class="t">i64</span> r = ms.down(d, n);
-        printf(<span class="s">&quot;%d migration(s) reverted, version %d\n&quot;</span>, r, migrate.version(d));
-    } <span class="k">else</span> <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;to&quot;</span>) &amp;&amp; argc &gt; <span class="n">3</span>) {
-        <span class="t">i64</span> v = number(argv[<span class="n">3</span>]);
-        <span class="k">if</span> (v &lt; <span class="n">0</span>) { usage(); <span class="k">return</span> <span class="n">2</span>; }
-        <span class="t">i64</span> r = ms.to(d, v);
-        printf(<span class="s">&quot;%d migration(s) ran, version %d\n&quot;</span>, r, migrate.version(d));
-    } <span class="k">else</span> <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;status&quot;</span>)) {
-        vec.Vec&lt;migrate.Status&gt; st = ms.status(d);
-        <span class="k">defer</span> st.free();
-        <span class="k">for</span> (<span class="k">auto</span> s : st) {
-            printf(<span class="s">&quot;%4d  %-8s %.*s\n&quot;</span>, s.version, s.applied ? <span class="s">&quot;applied&quot;</span> : <span class="s">&quot;pending&quot;</span>,
-                   s.name.len, s.name.ptr);
-        }
-    } <span class="k">else</span> <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;version&quot;</span>)) {
-        printf(<span class="s">&quot;%d\n&quot;</span>, migrate.version(d));
-    } <span class="k">else</span> {
-        usage();
-        <span class="k">return</span> <span class="n">2</span>;
-    }
-    <span class="k">return</span> <span class="n">0</span>;
-}
-
-<span class="t">i32</span> main(<span class="t">i32</span> argc, <span class="t">u8</span> **argv) {
-    <span class="k">if</span> (argc &lt; <span class="n">2</span> || !str.equals(cstr.view(argv[<span class="n">1</span>]), <span class="s">&quot;migrate&quot;</span>)) {
-        usage();
-        <span class="k">return</span> <span class="n">2</span>;
-    }
+<span class="t">i32</span> main() {
     sql.Db *db = sql.open(<span class="s">&quot;notes.db&quot;</span>);
     <span class="k">if</span> (!db) {
         printf(<span class="s">&quot;can&#x27;t open notes.db\n&quot;</span>);
@@ -181,139 +135,119 @@ $ ./notes
     }
     <span class="k">defer</span> sql.close(db);
 
-    <span class="k">try</span> {
-        migrate.Migrations ms = migrate.load(<span class="s">&quot;migrations&quot;</span>);
-        <span class="k">defer</span> ms.free();
-        migrate.Driver d = sqlite.driver(db);
-        <span class="k">return</span> migrateCommand(&amp;ms, &amp;d, argc, argv);
-    } <span class="k">catch</span> (<span class="t">Error</span> e) {
-        printf(<span class="s">&quot;%s\n&quot;</span>, e.message);
-        <span class="k">return</span> <span class="n">1</span>;
+    migrate.Migrations ms = migrate.load(<span class="s">&quot;migrations&quot;</span>);
+    <span class="k">defer</span> ms.free();
+    migrate.Driver d = sqlite.driver(db);
+    <span class="t">i64</span> n = ms.up(&amp;d);
+    printf(<span class="s">&quot;%d migration(s) applied, version %d\n&quot;</span>, n, migrate.version(&amp;d));
+
+    vec.Vec&lt;migrate.Status&gt; st = ms.status(&amp;d);
+    <span class="k">defer</span> st.free();
+    <span class="k">for</span> (<span class="k">auto</span> s : st) {
+        printf(<span class="s">&quot;%4d  %-8s %.*s\n&quot;</span>, s.version, s.applied ? <span class="s">&quot;applied&quot;</span> : <span class="s">&quot;pending&quot;</span>, s.name.len, s.name.ptr);
     }
     <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
-<p>Every call of the runner throws <code>migrate.ERR_MIGRATE</code> when something goes wrong, and so does <code>load</code>. The message names the file and says what the database said, so <code>main</code> catches it and prints it. <a href="#when-a-migration-fails">When a migration fails</a> shows what the messages look like.</p>
-<p>On a new database:</p>
 <pre class="code"><code>$ ktm build
-$ ./notes migrate status
-   1  pending  create_notes
-   2  pending  create_tags
-$ ./notes migrate up
+$ ./notes
 2 migration(s) applied, version 2
-$ ./notes migrate status
    1  applied  create_notes
    2  applied  create_tags
-$ ./notes migrate version
-2
-$ ./notes migrate down
-1 migration(s) reverted, version 1
-$ ./notes migrate to 0
-1 migration(s) ran, version 0
-$ ./notes migrate to 2
-2 migration(s) ran, version 2
-$ ./notes migrate down 5
-2 migration(s) reverted, version 0
-$ ./notes migrate to 7
-migrate: there is no migration 7</code></pre>
-<ul><li><code>ms.status(&amp;d)</code> lists every migration with <code>version</code>, <code>name</code> and <code>applied</code>. The <code>vec.Vec</code> is yours to free. The names are views of <code>ms</code>, so free <code>ms</code> after you are done with them.</li><li><code>ms.down(&amp;d, n)</code> reverts the newest <code>n</code> applied migrations, newest first. Without <code>n</code> it reverts one. It stops early when nothing is left, so <code>down 5</code> on two migrations reverts two.</li><li><code>ms.to(&amp;d, version)</code> goes up or down until <code>version</code> is the newest applied. <code>to 0</code> reverts everything. A version that isn't a migration is an error.</li><li>A down script throws away what its up script made. <code>down</code> on <code>create_tags</code> drops the tags, along with every row in that table. Use it while developing, and think twice in production.</li></ul>
+$ ./notes
+0 migration(s) applied, version 2
+   1  applied  create_notes
+   2  applied  create_tags</code></pre>
+<ul><li><code>ms.status(&amp;d)</code> returns a <code>vec.Vec&lt;migrate.Status&gt;</code> with <code>version</code>, <code>name</code> and <code>applied</code> for each migration. The vector is yours to free. The names are views of <code>ms</code>, so free <code>ms</code> after you are done with them.</li><li>A migration the database doesn't have yet shows as <code>pending</code>.</li></ul>
+<h2 id="going-back"><a href="#going-back">Going back</a></h2>
+<p>Three more calls move a database the other way. This <code>main.ktm</code> goes through all of them on the same two migrations:</p>
+<pre class="code"><code><span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-migrate&quot;</span>;
+<span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-migrate/sqlite&quot;</span>;
+<span class="k">import</span> sql;
+
+<span class="t">i32</span> main() {
+    sql.Db *db = sql.open(<span class="s">&quot;notes.db&quot;</span>);
+    <span class="k">if</span> (!db) {
+        printf(<span class="s">&quot;can&#x27;t open notes.db\n&quot;</span>);
+        <span class="k">return</span> <span class="n">1</span>;
+    }
+    <span class="k">defer</span> sql.close(db);
+
+    migrate.Migrations ms = migrate.load(<span class="s">&quot;migrations&quot;</span>);
+    <span class="k">defer</span> ms.free();
+    migrate.Driver d = sqlite.driver(db);
+
+    <span class="t">i64</span> n = ms.up(&amp;d);
+    printf(<span class="s">&quot;up:      %d ran, version %d\n&quot;</span>, n, migrate.version(&amp;d));
+    n = ms.down(&amp;d);
+    printf(<span class="s">&quot;down:    %d ran, version %d\n&quot;</span>, n, migrate.version(&amp;d));
+    n = ms.to(&amp;d, <span class="n">2</span>);
+    printf(<span class="s">&quot;to 2:    %d ran, version %d\n&quot;</span>, n, migrate.version(&amp;d));
+    n = ms.to(&amp;d, <span class="n">0</span>);
+    printf(<span class="s">&quot;to 0:    %d ran, version %d\n&quot;</span>, n, migrate.version(&amp;d));
+    n = ms.up(&amp;d);
+    printf(<span class="s">&quot;up:      %d ran, version %d\n&quot;</span>, n, migrate.version(&amp;d));
+    n = ms.down(&amp;d, <span class="n">5</span>);
+    printf(<span class="s">&quot;down 5:  %d ran, version %d\n&quot;</span>, n, migrate.version(&amp;d));
+    <span class="k">try</span> {
+        ms.to(&amp;d, <span class="n">7</span>);
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        printf(<span class="s">&quot;to 7:    %s\n&quot;</span>, e.message);
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>$ ktm build
+$ rm -f notes.db
+$ ./notes
+up:      2 ran, version 2
+down:    1 ran, version 1
+to 2:    1 ran, version 2
+to 0:    2 ran, version 0
+up:      2 ran, version 2
+down 5:  2 ran, version 0
+to 7:    migrate: there is no migration 7</code></pre>
+<ul><li><code>ms.down(&amp;d)</code> reverts the newest applied migration. <code>ms.down(&amp;d, n)</code> reverts the newest <code>n</code>, newest first, and stops early when nothing is left: <code>down 5</code> on two migrations reverts two.</li><li><code>ms.to(&amp;d, version)</code> goes up or down until <code>version</code> is the newest applied. <code>to 0</code> reverts everything. A version that isn't a migration is an error.</li><li>Every call returns how many migrations ran.</li><li>Every call throws <code>migrate.ERR_MIGRATE</code> when something goes wrong, and so does <code>load</code>. The message names the file and says what the database said. <a href="#when-a-migration-fails">When a migration fails</a> shows what the messages look like.</li><li>A down script throws away what its up script made. Reverting <code>create_tags</code> drops the tags, with every row in that table. Going back is for development and for undoing a bad deploy, and it costs data.</li></ul>
 <h2 id="migrating-at-start-up"><a href="#migrating-at-start-up">Migrating at start-up</a></h2>
-<p>The usual place to migrate is when the program starts, before it serves anything. Then a new build that needs a new column brings it along. Add a third migration, a <code>pinned</code> flag on notes.</p>
+<p>The usual place to migrate is when the program starts, before it does anything else. A new build that needs a new column then brings it along. Add a third migration, a <code>pinned</code> flag on notes.</p>
 <p><code>migrations/003_add_pinned.up.sql</code>:</p>
 <pre class="code"><code>ALTER TABLE notes ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;</code></pre>
 <p><code>migrations/003_add_pinned.down.sql</code>:</p>
 <pre class="code"><code>ALTER TABLE notes DROP COLUMN pinned;</code></pre>
 <p><code>DROP COLUMN</code> needs SQLite 3.35 (2021) or newer.</p>
-<p>The program gets three commands of its own, <code>add</code>, <code>pin</code> and <code>list</code>. Each runs after <code>ms.up</code>, so it always finds the tables it expects. The <code>migrate</code> command stays as it was. <code>usage</code> changes; <code>number</code> and <code>migrateCommand</code> are the same as in the last section and are repeated here so the file is whole:</p>
+<p>Now <code>main.ktm</code> is a program that uses the database. It migrates first, then lists the notes, pinned ones first:</p>
 <pre class="code"><code><span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-migrate&quot;</span>;
 <span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-migrate/sqlite&quot;</span>;
-<span class="k">import</span> cstr, sql, str, vec;
+<span class="k">import</span> sql;
 
-<span class="t">void</span> usage() {
-    printf(<span class="s">&quot;usage: notes add &lt;title&gt; [body] | pin &lt;id&gt; | list\n&quot;</span>
-           <span class="s">&quot;       notes migrate up | down [n] | to &lt;version&gt; | status | version\n&quot;</span>);
-}
-
-<span class="c">/* arg as a whole number, or -1 */</span>
-<span class="t">i64</span> number(<span class="t">u8</span> *arg) {
-    <span class="t">i64</span> n;
-    <span class="k">if</span> (!str.toInt(cstr.view(arg), &amp;n) || n &lt; <span class="n">0</span>) { <span class="k">return</span> -<span class="n">1</span>; }
-    <span class="k">return</span> n;
-}
-
-<span class="t">i32</span> migrateCommand(migrate.Migrations *ms, migrate.Driver *d, <span class="t">i32</span> argc, <span class="t">u8</span> **argv) {
-    <span class="t">u8</span>[] cmd = argc &gt; <span class="n">2</span> ? cstr.view(argv[<span class="n">2</span>]) : <span class="s">&quot;&quot;</span>;
-    <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;up&quot;</span>)) {
-        <span class="t">i64</span> n = ms.up(d);
-        printf(<span class="s">&quot;%d migration(s) applied, version %d\n&quot;</span>, n, migrate.version(d));
-    } <span class="k">else</span> <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;down&quot;</span>)) {
-        <span class="t">i64</span> n = argc &gt; <span class="n">3</span> ? number(argv[<span class="n">3</span>]) : <span class="n">1</span>;
-        <span class="k">if</span> (n &lt; <span class="n">1</span>) { usage(); <span class="k">return</span> <span class="n">2</span>; }
-        <span class="t">i64</span> r = ms.down(d, n);
-        printf(<span class="s">&quot;%d migration(s) reverted, version %d\n&quot;</span>, r, migrate.version(d));
-    } <span class="k">else</span> <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;to&quot;</span>) &amp;&amp; argc &gt; <span class="n">3</span>) {
-        <span class="t">i64</span> v = number(argv[<span class="n">3</span>]);
-        <span class="k">if</span> (v &lt; <span class="n">0</span>) { usage(); <span class="k">return</span> <span class="n">2</span>; }
-        <span class="t">i64</span> r = ms.to(d, v);
-        printf(<span class="s">&quot;%d migration(s) ran, version %d\n&quot;</span>, r, migrate.version(d));
-    } <span class="k">else</span> <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;status&quot;</span>)) {
-        vec.Vec&lt;migrate.Status&gt; st = ms.status(d);
-        <span class="k">defer</span> st.free();
-        <span class="k">for</span> (<span class="k">auto</span> s : st) {
-            printf(<span class="s">&quot;%4d  %-8s %.*s\n&quot;</span>, s.version, s.applied ? <span class="s">&quot;applied&quot;</span> : <span class="s">&quot;pending&quot;</span>,
-                   s.name.len, s.name.ptr);
+<span class="c">/* Brings the database up to date: false when a migration failed */</span>
+<span class="t">bool</span> migrateDb(sql.Db *db) {
+    <span class="k">try</span> {
+        migrate.Migrations ms = migrate.load(<span class="s">&quot;migrations&quot;</span>);
+        <span class="k">defer</span> ms.free();
+        migrate.Driver d = sqlite.driver(db);
+        <span class="t">i64</span> n = ms.up(&amp;d);
+        <span class="k">if</span> (n) {
+            printf(<span class="s">&quot;%d migration(s) applied, version %d\n&quot;</span>, n, migrate.version(&amp;d));
         }
-    } <span class="k">else</span> <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;version&quot;</span>)) {
-        printf(<span class="s">&quot;%d\n&quot;</span>, migrate.version(d));
-    } <span class="k">else</span> {
-        usage();
-        <span class="k">return</span> <span class="n">2</span>;
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        printf(<span class="s">&quot;%s\n&quot;</span>, e.message);
+        <span class="k">return</span> <span class="k">false</span>;
     }
-    <span class="k">return</span> <span class="n">0</span>;
+    <span class="k">return</span> <span class="k">true</span>;
 }
 
-<span class="t">i32</span> add(sql.Db *db, <span class="t">u8</span> *title, <span class="t">u8</span> *body) {
-    sql.Param p[<span class="n">2</span>];
-    p[<span class="n">0</span>].type = sql.TEXT;
-    p[<span class="n">0</span>].str = cstr.view(title);
-    p[<span class="n">1</span>].type = sql.TEXT;
-    p[<span class="n">1</span>].str = cstr.view(body);
-    <span class="k">if</span> (!sql.exec(db, <span class="s">&quot;INSERT INTO notes (title, body) VALUES (?, ?)&quot;</span>, p, <span class="n">2</span>)) {
-        printf(<span class="s">&quot;%s\n&quot;</span>, sql.sqlite3_errmsg(db.conn));
-        <span class="k">return</span> <span class="n">1</span>;
-    }
-    <span class="k">return</span> <span class="n">0</span>;
-}
-
-<span class="t">i32</span> pin(sql.Db *db, <span class="t">u8</span> *arg) {
-    sql.Param p[<span class="n">1</span>];
-    p[<span class="n">0</span>].type = sql.INT;
-    p[<span class="n">0</span>].intVal = number(arg);
-    <span class="k">if</span> (!sql.exec(db, <span class="s">&quot;UPDATE notes SET pinned = 1 WHERE id = ?&quot;</span>, p, <span class="n">1</span>)) {
-        printf(<span class="s">&quot;%s\n&quot;</span>, sql.sqlite3_errmsg(db.conn));
-        <span class="k">return</span> <span class="n">1</span>;
-    }
-    <span class="k">return</span> <span class="n">0</span>;
-}
-
-<span class="t">i32</span> list(sql.Db *db) {
+<span class="t">void</span> listNotes(sql.Db *db) {
     sql.Row row;
     <span class="k">if</span> (!sql.select(db, &amp;row, <span class="s">&quot;SELECT id, pinned, title FROM notes ORDER BY pinned DESC, id&quot;</span>)) {
         printf(<span class="s">&quot;%s\n&quot;</span>, sql.sqlite3_errmsg(db.conn));
-        <span class="k">return</span> <span class="n">1</span>;
+        <span class="k">return</span>;
     }
     <span class="k">while</span> (sql.next(&amp;row)) {
         printf(<span class="s">&quot;%3d %s %.*s\n&quot;</span>, row.col[<span class="n">0</span>].intVal, row.col[<span class="n">1</span>].intVal ? <span class="s">&quot;*&quot;</span> : <span class="s">&quot; &quot;</span>,
                row.col[<span class="n">2</span>].str.len, row.col[<span class="n">2</span>].str.ptr);
     }
-    <span class="k">return</span> <span class="n">0</span>;
 }
 
-<span class="t">i32</span> main(<span class="t">i32</span> argc, <span class="t">u8</span> **argv) {
-    <span class="k">if</span> (argc &lt; <span class="n">2</span>) {
-        usage();
-        <span class="k">return</span> <span class="n">2</span>;
-    }
-    <span class="t">u8</span>[] cmd = cstr.view(argv[<span class="n">1</span>]);
+<span class="t">i32</span> main() {
     sql.Db *db = sql.open(<span class="s">&quot;notes.db&quot;</span>);
     <span class="k">if</span> (!db) {
         printf(<span class="s">&quot;can&#x27;t open notes.db\n&quot;</span>);
@@ -322,52 +256,22 @@ migrate: there is no migration 7</code></pre>
     <span class="k">defer</span> sql.close(db);
     sql.exec(db, <span class="s">&quot;PRAGMA foreign_keys = ON&quot;</span>);
 
-    <span class="k">try</span> {
-        migrate.Migrations ms = migrate.load(<span class="s">&quot;migrations&quot;</span>);
-        <span class="k">defer</span> ms.free();
-        migrate.Driver d = sqlite.driver(db);
-        <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;migrate&quot;</span>)) {
-            <span class="k">return</span> migrateCommand(&amp;ms, &amp;d, argc, argv);
-        }
-        ms.up(&amp;d);
-    } <span class="k">catch</span> (<span class="t">Error</span> e) {
-        printf(<span class="s">&quot;%s\n&quot;</span>, e.message);
+    <span class="k">if</span> (!migrateDb(db)) {
         <span class="k">return</span> <span class="n">1</span>;
     }
-
-    <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;add&quot;</span>) &amp;&amp; argc &gt; <span class="n">2</span>) {
-        <span class="k">return</span> add(db, argv[<span class="n">2</span>], argc &gt; <span class="n">3</span> ? argv[<span class="n">3</span>] : <span class="s">&quot;&quot;</span>);
-    } <span class="k">else</span> <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;pin&quot;</span>) &amp;&amp; argc &gt; <span class="n">2</span>) {
-        <span class="k">return</span> pin(db, argv[<span class="n">2</span>]);
-    } <span class="k">else</span> <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;list&quot;</span>)) {
-        <span class="k">return</span> list(db);
-    }
-    usage();
-    <span class="k">return</span> <span class="n">2</span>;
+    listNotes(db);
+    <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
+<p><code>migrateDb</code> prints only when something ran, so a normal start is quiet. When a migration fails the program stops, instead of running against a schema it doesn't expect.</p>
 <pre class="code"><code>$ ktm build
-$ ./notes add &quot;buy milk&quot;
-$ ./notes add &quot;call ann&quot; &quot;about the trip&quot;
-$ ./notes add &quot;fix the bike&quot;
-$ ./notes pin 2
-$ ./notes list
-  2 * call ann
-  1   buy milk
-  3   fix the bike
-$ ./notes migrate status
-   1  applied  create_notes
-   2  applied  create_tags
-   3  applied  add_pinned</code></pre>
-<p>The first <code>add</code> found the database at version 2, so it applied <code>add_pinned</code> first. A copy of the program that is still at version 2 somewhere else will do the same on its next start.</p>
-<p>Reverting <code>add_pinned</code> drops the column and the pins with it. The next normal command applies it again, with every pin at its default, <code>0</code>:</p>
-<pre class="code"><code>$ ./notes migrate down
-1 migration(s) reverted, version 2
-$ ./notes list
+$ ./notes
+3 migration(s) applied, version 3
+$ sqlite3 notes.db &quot;INSERT INTO notes (title) VALUES (&#x27;buy milk&#x27;), (&#x27;call ann&#x27;), (&#x27;fix the bike&#x27;)&quot;
+$ ./notes
   1   buy milk
   2   call ann
-  3   fix the bike
-$ ./notes migrate up
-0 migration(s) applied, version 3</code></pre>
+  3   fix the bike</code></pre>
+<p>The last section left the database at version 0, so the first start applied all three. A copy of the program whose database is at version 2 applies only <code>add_pinned</code> on its next start.</p>
 <ul><li>Migrate before anything else touches the database: before a server listens, before workers start.</li><li><code>ms.up</code> only does work when something is pending. On an up-to-date database it costs one query.</li><li>SQLite checks foreign keys (<code>ON DELETE CASCADE</code> on <code>tags</code>) only when the connection turns them on, so <code>main</code> runs <code>PRAGMA foreign_keys = ON</code> after opening. The setting belongs to the connection, not the file.</li></ul>
 <h2 id="changes-sqlite-can-t-make-with-alter-table"><a href="#changes-sqlite-can-t-make-with-alter-table">Changes SQLite can't make with ALTER TABLE</a></h2>
 <p>SQLite's <code>ALTER TABLE</code> can add, rename and drop columns, but it can't add a <code>CHECK</code> or a foreign key to an existing table, or change a column's type. For those, SQLite's own instructions are to build a new table, copy the rows over, drop the old one and rename the new one. While that runs, foreign keys have to be off, or dropping <code>notes</code> would delete every tag through <code>ON DELETE CASCADE</code>. But <code>PRAGMA foreign_keys</code> does nothing inside a transaction, and every migration runs inside one.</p>
@@ -407,16 +311,18 @@ ALTER TABLE notes_new RENAME TO notes;
 PRAGMA foreign_key_check;
 COMMIT;
 PRAGMA foreign_keys = ON;</code></pre>
-<pre class="code"><code>$ ./notes pin 2
-$ ./notes migrate up
+<pre class="code"><code>$ sqlite3 notes.db &quot;UPDATE notes SET pinned = 1 WHERE id = 2&quot;
+$ sqlite3 notes.db &quot;INSERT INTO tags VALUES (2, &#x27;family&#x27;)&quot;
+$ ./notes
 1 migration(s) applied, version 4
-$ ./notes list
   2 * call ann
   1   buy milk
   3   fix the bike
-$ ./notes add &quot;$(printf &#x27;x%.0s&#x27; $(seq 1 201))&quot;
-CHECK constraint failed: length(title) &lt;= 200</code></pre>
-<p>The notes and the pin survived, and so does every tag: with foreign keys on, <code>DROP TABLE notes</code> would have deleted them all. The new table has the limit.</p>
+$ sqlite3 notes.db &quot;SELECT * FROM tags&quot;
+2|family
+$ sqlite3 notes.db &quot;INSERT INTO notes (title) VALUES (&#x27;$(printf &#x27;x%.0s&#x27; $(seq 1 201))&#x27;)&quot;
+Error: stepping, CHECK constraint failed: length(title) &lt;= 200 (19)</code></pre>
+<p>The notes, the pin and the tag survived: with foreign keys on, <code>DROP TABLE notes</code> would have deleted every tag. The new table has the limit.</p>
 <ul><li>The marker must be the first line of the script, exactly <code>-- migrate: no-transaction</code> (whitespace around it doesn't matter).</li><li>Without the runner's transaction, the script and its row in <code>schema_migrations</code> are no longer one step. Give the script its own <code>BEGIN</code> and <code>COMMIT</code> whenever it can have them, as this one does.</li><li>When a no-transaction script fails, the error ends in <code>(it ran without a transaction: what ran before the error stays)</code>. Here everything after <code>BEGIN</code> is undone when the program closes the database without a <code>COMMIT</code>. The migration stays pending, so it can run again once the data is fixed.</li></ul>
 <h2 id="when-a-migration-fails"><a href="#when-a-migration-fails">When a migration fails</a></h2>
 <p>A migration that fails is rolled back, the error names its file, and the migrations before it stay applied. Here is a migration with a typo, <code>notebook</code> for <code>notebooks</code>:</p>
@@ -424,17 +330,16 @@ CHECK constraint failed: length(title) &lt;= 200</code></pre>
 <pre class="code"><code>CREATE TABLE notebooks (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
 ALTER TABLE notes ADD COLUMN notebook_id INTEGER REFERENCES notebook (id);
 INSERT INTO notebook (name) VALUES (&#x27;inbox&#x27;);</code></pre>
-<pre class="code"><code>$ ./notes migrate up
+<pre class="code"><code>$ ./notes
 migrate: 5_add_notebooks.up.sql: no such table: notebook
-$ ./notes migrate status
-   1  applied  create_notes
-   2  applied  create_tags
-   3  applied  add_pinned
-   4  applied  title_limit
-   5  pending  add_notebooks
+$ sqlite3 notes.db &quot;SELECT version, name FROM schema_migrations&quot;
+1|create_notes
+2|create_tags
+3|add_pinned
+4|title_limit
 $ sqlite3 notes.db &quot;SELECT name FROM sqlite_master WHERE name = &#x27;notebooks&#x27;&quot;
 $</code></pre>
-<p>The <code>notebooks</code> table the first statement made is gone too, since the whole migration was one transaction. Fix the file and run <code>up</code> again. The file name in the message is built from the version number, so <code>005_add_notebooks</code> shows as <code>5_add_notebooks</code>.</p>
+<p>Version 5 isn't recorded, and the <code>notebooks</code> table its first statement made is gone too, since the whole migration was one transaction. The program stopped before listing anything. Fix the file and start it again. The file name in the message is built from the version number, so <code>005_add_notebooks</code> shows as <code>5_add_notebooks</code>.</p>
 <p>To act on the failure in code, catch the error and look at its code:</p>
 <pre class="code"><code><span class="k">try</span> {
     ms.up(&amp;d);
@@ -565,66 +470,27 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS tags_by_tag ON tags (tag);</code></pre>
 <pre class="code"><code>-- migrate: no-transaction
 DROP INDEX CONCURRENTLY IF EXISTS tags_by_tag;</code></pre>
 <p>Without a transaction, a failed <code>CREATE INDEX CONCURRENTLY</code> isn't rolled back: it leaves an invalid index named <code>tags_by_tag</code> behind, and <code>IF NOT EXISTS</code> would then skip it on the next run. After such a failure, <code>DROP INDEX tags_by_tag</code> before running the migration again.</p>
-<p><code>main.ktm</code> connects with ktm-pg and makes the driver with <code>postgres.driver(c)</code>. <code>usage</code>, <code>number</code> and <code>migrateCommand</code> are the same as in <a href="#a-migrate-command">A migrate command</a>:</p>
+<p><code>main.ktm</code> connects with ktm-pg, makes the driver with <code>postgres.driver(c)</code>, applies what is pending and prints the status:</p>
 <pre class="code"><code><span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-pg&quot;</span>;
 <span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-migrate&quot;</span>;
 <span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-migrate/postgres&quot;</span>;
-<span class="k">import</span> cstr, str, vec;
+<span class="k">import</span> vec;
 
-<span class="t">void</span> usage() {
-    printf(<span class="s">&quot;usage: notes migrate up | down [n] | to &lt;version&gt; | status | version\n&quot;</span>);
-}
-
-<span class="c">/* arg as a whole number, or -1 */</span>
-<span class="t">i64</span> number(<span class="t">u8</span> *arg) {
-    <span class="t">i64</span> n;
-    <span class="k">if</span> (!str.toInt(cstr.view(arg), &amp;n) || n &lt; <span class="n">0</span>) { <span class="k">return</span> -<span class="n">1</span>; }
-    <span class="k">return</span> n;
-}
-
-<span class="t">i32</span> migrateCommand(migrate.Migrations *ms, migrate.Driver *d, <span class="t">i32</span> argc, <span class="t">u8</span> **argv) {
-    <span class="t">u8</span>[] cmd = argc &gt; <span class="n">2</span> ? cstr.view(argv[<span class="n">2</span>]) : <span class="s">&quot;&quot;</span>;
-    <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;up&quot;</span>)) {
-        <span class="t">i64</span> n = ms.up(d);
-        printf(<span class="s">&quot;%d migration(s) applied, version %d\n&quot;</span>, n, migrate.version(d));
-    } <span class="k">else</span> <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;down&quot;</span>)) {
-        <span class="t">i64</span> n = argc &gt; <span class="n">3</span> ? number(argv[<span class="n">3</span>]) : <span class="n">1</span>;
-        <span class="k">if</span> (n &lt; <span class="n">1</span>) { usage(); <span class="k">return</span> <span class="n">2</span>; }
-        <span class="t">i64</span> r = ms.down(d, n);
-        printf(<span class="s">&quot;%d migration(s) reverted, version %d\n&quot;</span>, r, migrate.version(d));
-    } <span class="k">else</span> <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;to&quot;</span>) &amp;&amp; argc &gt; <span class="n">3</span>) {
-        <span class="t">i64</span> v = number(argv[<span class="n">3</span>]);
-        <span class="k">if</span> (v &lt; <span class="n">0</span>) { usage(); <span class="k">return</span> <span class="n">2</span>; }
-        <span class="t">i64</span> r = ms.to(d, v);
-        printf(<span class="s">&quot;%d migration(s) ran, version %d\n&quot;</span>, r, migrate.version(d));
-    } <span class="k">else</span> <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;status&quot;</span>)) {
-        vec.Vec&lt;migrate.Status&gt; st = ms.status(d);
-        <span class="k">defer</span> st.free();
-        <span class="k">for</span> (<span class="k">auto</span> s : st) {
-            printf(<span class="s">&quot;%4d  %-8s %.*s\n&quot;</span>, s.version, s.applied ? <span class="s">&quot;applied&quot;</span> : <span class="s">&quot;pending&quot;</span>,
-                   s.name.len, s.name.ptr);
-        }
-    } <span class="k">else</span> <span class="k">if</span> (str.equals(cmd, <span class="s">&quot;version&quot;</span>)) {
-        printf(<span class="s">&quot;%d\n&quot;</span>, migrate.version(d));
-    } <span class="k">else</span> {
-        usage();
-        <span class="k">return</span> <span class="n">2</span>;
-    }
-    <span class="k">return</span> <span class="n">0</span>;
-}
-
-<span class="t">i32</span> main(<span class="t">i32</span> argc, <span class="t">u8</span> **argv) {
-    <span class="k">if</span> (argc &lt; <span class="n">2</span> || !str.equals(cstr.view(argv[<span class="n">1</span>]), <span class="s">&quot;migrate&quot;</span>)) {
-        usage();
-        <span class="k">return</span> <span class="n">2</span>;
-    }
+<span class="t">i32</span> main() {
     <span class="k">try</span> {
         pg.Conn *c = pg.connect();      <span class="c">/* PGHOST, PGUSER, ... or a URL */</span>
         <span class="k">defer</span> c.close();
         migrate.Migrations ms = migrate.load(<span class="s">&quot;migrations&quot;</span>);
         <span class="k">defer</span> ms.free();
         migrate.Driver d = postgres.driver(c);
-        <span class="k">return</span> migrateCommand(&amp;ms, &amp;d, argc, argv);
+        <span class="t">i64</span> n = ms.up(&amp;d);
+        printf(<span class="s">&quot;%d migration(s) applied, version %d\n&quot;</span>, n, migrate.version(&amp;d));
+
+        vec.Vec&lt;migrate.Status&gt; st = ms.status(&amp;d);
+        <span class="k">defer</span> st.free();
+        <span class="k">for</span> (<span class="k">auto</span> s : st) {
+            printf(<span class="s">&quot;%4d  %-8s %.*s\n&quot;</span>, s.version, s.applied ? <span class="s">&quot;applied&quot;</span> : <span class="s">&quot;pending&quot;</span>, s.name.len, s.name.ptr);
+        }
     } <span class="k">catch</span> (<span class="t">Error</span> e) {
         printf(<span class="s">&quot;%s\n&quot;</span>, e.message);
         <span class="k">return</span> <span class="n">1</span>;
@@ -634,43 +500,49 @@ DROP INDEX CONCURRENTLY IF EXISTS tags_by_tag;</code></pre>
 <p><code>pg.connect()</code> with no URL takes the server from <code>PGHOST</code>, <code>PGPORT</code>, <code>PGUSER</code>, <code>PGPASSWORD</code> and <code>PGDATABASE</code>. A URL works too: <code>pg.connect(&quot;postgres://ann:secret@localhost:5432/notes&quot;)</code>. It throws when it can't connect, so it goes inside the <code>try</code>.</p>
 <pre class="code"><code>$ export PGHOST=127.0.0.1 PGUSER=postgres PGPASSWORD=secret PGDATABASE=notes
 $ ktm build
-$ ./notes migrate status
-   1  pending  create_notes
-   2  pending  create_tags
-   3  pending  index_tags
-$ ./notes migrate up
+$ ./notes
 3 migration(s) applied, version 3
-$ ./notes migrate down
-1 migration(s) reverted, version 2
-$ ./notes migrate to 0
-2 migration(s) ran, version 0
-$ ./notes migrate up
-3 migration(s) applied, version 3
-$ PGPASSWORD=wrong ./notes migrate up
+   1  applied  create_notes
+   2  applied  create_tags
+   3  applied  index_tags
+$ ./notes
+0 migration(s) applied, version 3
+   1  applied  create_notes
+   2  applied  create_tags
+   3  applied  index_tags
+$ PGPASSWORD=wrong ./notes
 pg: FATAL: password authentication failed for user &quot;postgres&quot; (SQLSTATE 28P01)
 $ psql -c &#x27;SELECT * FROM schema_migrations&#x27;
  version |     name     |         applied_at
 ---------+--------------+----------------------------
-       1 | create_notes | 2026-10-16 02:05:19.15737
-       2 | create_tags  | 2026-10-16 02:05:19.161077
-       3 | index_tags   | 2026-10-16 02:05:19.163924
+       1 | create_notes | 2026-10-16 02:09:08.072007
+       2 | create_tags  | 2026-10-16 02:09:08.073708
+       3 | index_tags   | 2026-10-16 02:09:08.077093
 (3 rows)</code></pre>
 <p>Errors from Postgres end with their SQLSTATE. The migration with a typo from <a href="#when-a-migration-fails">When a migration fails</a>, written for Postgres as <code>004_add_notebooks.up.sql</code>:</p>
 <pre class="out"><code>migrate: 4_add_notebooks.up.sql: relation &quot;notebook&quot; does not exist (SQLSTATE 42P01)</code></pre>
 <h3 id="with-a-pool"><a href="#with-a-pool">With a pool</a></h3>
-<p>A server usually has a <code>pg.Pool</code>, not one connection. <code>postgres.driverPool(pool)</code> takes one connection from the pool for each call (<code>up</code>, <code>down</code>, <code>to</code>, <code>status</code>, <code>version</code>) and gives it back when the call ends, after a failure too. Only <code>main</code> changes:</p>
-<pre class="code"><code><span class="t">i32</span> main(<span class="t">i32</span> argc, <span class="t">u8</span> **argv) {
-    <span class="k">if</span> (argc &lt; <span class="n">2</span> || !str.equals(cstr.view(argv[<span class="n">1</span>]), <span class="s">&quot;migrate&quot;</span>)) {
-        usage();
-        <span class="k">return</span> <span class="n">2</span>;
-    }
+<p>A server usually has a <code>pg.Pool</code>, not one connection. <code>postgres.driverPool(pool)</code> takes one connection from the pool for each call (<code>up</code>, <code>down</code>, <code>to</code>, <code>status</code>, <code>version</code>) and gives it back when the call ends, after a failure too. Two lines of <code>main</code> change, the rest stays:</p>
+<pre class="code"><code><span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-pg&quot;</span>;
+<span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-migrate&quot;</span>;
+<span class="k">import</span> <span class="s">&quot;github.com/ozzenerol/ktm-migrate/postgres&quot;</span>;
+<span class="k">import</span> vec;
+
+<span class="t">i32</span> main() {
     <span class="k">try</span> {
         pg.Pool *pool = pg.open();
         <span class="k">defer</span> pool.close();
         migrate.Migrations ms = migrate.load(<span class="s">&quot;migrations&quot;</span>);
         <span class="k">defer</span> ms.free();
         migrate.Driver d = postgres.driverPool(pool);
-        <span class="k">return</span> migrateCommand(&amp;ms, &amp;d, argc, argv);
+        <span class="t">i64</span> n = ms.up(&amp;d);
+        printf(<span class="s">&quot;%d migration(s) applied, version %d\n&quot;</span>, n, migrate.version(&amp;d));
+
+        vec.Vec&lt;migrate.Status&gt; st = ms.status(&amp;d);
+        <span class="k">defer</span> st.free();
+        <span class="k">for</span> (<span class="k">auto</span> s : st) {
+            printf(<span class="s">&quot;%4d  %-8s %.*s\n&quot;</span>, s.version, s.applied ? <span class="s">&quot;applied&quot;</span> : <span class="s">&quot;pending&quot;</span>, s.name.len, s.name.ptr);
+        }
     } <span class="k">catch</span> (<span class="t">Error</span> e) {
         printf(<span class="s">&quot;%s\n&quot;</span>, e.message);
         <span class="k">return</span> <span class="n">1</span>;
@@ -681,35 +553,38 @@ $ psql -c &#x27;SELECT * FROM schema_migrations&#x27;
 <h2 id="several-instances-at-once"><a href="#several-instances-at-once">Several instances at once</a></h2>
 <p>Two copies of a program that start together, such as two containers of one service, must not both apply the same migration. Each driver has a lock for that:</p>
 <ul><li><strong>SQLite:</strong> each migration starts with <code>BEGIN IMMEDIATE</code>, which takes the database file's write lock. A second program waits for it, up to 10 seconds (the driver sets <code>busy_timeout</code> to 10000), then finds the migration already applied and skips it.</li><li><strong>PostgreSQL:</strong> the runner holds <code>pg_advisory_lock(postgres.LOCK_KEY)</code> for the whole call, so the instances take turns. The later ones find nothing left to do.</li><li>Inside each migration's transaction, the runner checks again whether the migration is applied. A migration never runs twice.</li></ul>
-<p>Two programs started together on one SQLite file, with a migration that takes a few seconds:</p>
-<pre class="code"><code>$ ./notes migrate up &amp; ./notes migrate up
-0 migration(s) applied, version 4
+<p>Two copies of the start-up program from <a href="#migrating-at-start-up">Migrating at start-up</a>, started together on a new SQLite file, with a migration that takes a few seconds:</p>
+<pre class="code"><code>$ ./notes &amp; ./notes
 4 migration(s) applied, version 4</code></pre>
+<p>One applied all four. The other waited for the lock, found nothing left, and printed nothing.</p>
 <p>On PostgreSQL there is a catch in ktm-migrate v0.1.1. When the pending migrations include a <code>CREATE INDEX CONCURRENTLY</code>, two instances that start together deadlock. <code>CREATE INDEX CONCURRENTLY</code> waits for every open transaction to end, including the other instance's query that is waiting for the lock. Postgres breaks the deadlock by failing the waiting instance:</p>
 <pre class="out"><code>deadlock detected (SQLSTATE 40P01); detail: Process 106 waits for ExclusiveLock on advisory lock [5,27508,1835886951,1]; blocked by process 105.</code></pre>
-<p>The first instance finishes the migrations. The failed one finds nothing to do when it starts again. Until this is fixed, deploy a concurrent index build with one instance, or run <code>migrate up</code> as a step of its own before the instances start.</p>
+<p>The first instance finishes the migrations. The failed one finds nothing to do when it starts again. Until this is fixed, deploy a concurrent index build with one instance, or run the migrations as a step of their own before the instances start.</p>
 <h2 id="branches-and-merged-migrations"><a href="#branches-and-merged-migrations">Branches and merged migrations</a></h2>
 <p>Two people on two branches can each add a migration. Numbering them <code>003</code> on both sides clashes when the branches merge: <code>load</code> refuses a version with two names. Versions made from the time (<code>YYYYMMDDHHMMSS</code>) don't clash:</p>
 <pre class="code"><code>migrations/
   20261001090000_create_a.up.sql
   20261002090000_create_b.up.sql     from the branch merged last
   20261003090000_create_c.up.sql</code></pre>
-<p><code>up</code> applies every migration the database doesn't have, including one whose version is lower than the newest applied:</p>
-<pre class="code"><code>$ ./notes migrate status
+<p><code>up</code> applies every migration the database doesn't have, including one whose version is lower than the newest applied. With the program from <a href="#see-where-a-database-is">See where a database is</a>, before and after the merge brings <code>create_b</code> in:</p>
+<pre class="code"><code>$ ./notes
+2 migration(s) applied, version 20261003090000
 20261001090000  applied  create_a
-20261002090000  pending  create_b
 20261003090000  applied  create_c
-$ ./notes migrate up
-1 migration(s) applied, version 20261003090000</code></pre>
-<p>The other way round, a database can have a version this build doesn't know, because a newer build ran it. <code>status</code> lists it with an empty name, and <code>down</code> refuses to go past it:</p>
-<pre class="code"><code>$ ./notes migrate status
+$ ./notes
+1 migration(s) applied, version 20261003090000
+20261001090000  applied  create_a
+20261002090000  applied  create_b
+20261003090000  applied  create_c</code></pre>
+<p>The other way round, a database can have a version this build doesn't know, because a newer build ran it. <code>status</code> lists it with an empty name:</p>
+<pre class="code"><code>$ ./notes
+0 migration(s) applied, version 5
    1  applied  create_notes
    2  applied  create_tags
    3  applied  add_pinned
    4  applied  title_limit
-   5  applied
-$ ./notes migrate down
-migrate: version 5 is applied, but there is no migration 5 here</code></pre>
+   5  applied</code></pre>
+<p><code>down</code> and <code>to</code> refuse to go past it, with <code>migrate: version 5 is applied, but there is no migration 5 here</code>.</p>
 <p><code>up</code> leaves such a version alone, so an older build still starts against a newer database.</p>
 <h2 id="a-driver-of-your-own"><a href="#a-driver-of-your-own">A driver of your own</a></h2>
 <p>Any SQL engine can use the runner through a <code>migrate.Driver</code>: four functions and a few fields.</p>
@@ -792,10 +667,10 @@ unlock</code></pre>
 <div class="table"><table><thead><tr><th>Call</th><th>What it does</th></tr></thead><tbody><tr><td><code>migrate.load(dir)</code></td><td>the migrations in <code>dir</code>, sorted by version</td></tr><tr><td><code>ms.add(version, name, up, down)</code></td><td>adds a migration written in the program; <code>down</code> may be left out</td></tr><tr><td><code>ms.up(&amp;d)</code></td><td>applies every pending migration in version order; returns how many ran</td></tr><tr><td><code>ms.down(&amp;d, n)</code></td><td>reverts the newest <code>n</code> applied migrations (1 when left out); returns how many ran</td></tr><tr><td><code>ms.to(&amp;d, version)</code></td><td>goes up or down until <code>version</code> is the newest applied; <code>0</code> reverts everything</td></tr><tr><td><code>ms.status(&amp;d)</code></td><td>a <code>vec.Vec&lt;migrate.Status&gt;</code>: every migration here and every version the database has</td></tr><tr><td><code>migrate.version(&amp;d)</code></td><td>the newest applied version, <code>0</code> for none</td></tr><tr><td><code>ms.free()</code></td><td>frees the migrations</td></tr><tr><td><code>sqlite.driver(db)</code></td><td>a Driver for an <code>sql.Db *</code></td></tr><tr><td><code>postgres.driver(c)</code></td><td>a Driver for a <code>pg.Conn *</code></td></tr><tr><td><code>postgres.driverPool(pool)</code></td><td>a Driver for a <code>pg.Pool *</code>, one connection per call</td></tr><tr><td><code>migrate.ERR_MIGRATE</code></td><td>the code of every error <code>load</code>, <code>add</code> and the runner throw</td></tr><tr><td><code>postgres.LOCK_KEY</code></td><td>the advisory lock's key</td></tr></tbody></table></div>
 <div class="table"><table><thead><tr><th>Type</th><th>Fields</th></tr></thead><tbody><tr><td><code>migrate.Migrations</code></td><td><code>items</code>, a <code>vec.Vec&lt;migrate.Migration&gt;</code></td></tr><tr><td><code>migrate.Migration</code></td><td><code>version</code>, <code>name</code>, <code>up</code>, <code>down</code> (<code>String</code>s), <code>hasDown</code></td></tr><tr><td><code>migrate.Status</code></td><td><code>version</code>, <code>name</code> (a <code>u8[]</code>, empty for a version only the database has), <code>applied</code></td></tr><tr><td><code>migrate.Driver</code></td><td><code>ctx</code>, <code>conn</code>, <code>exec</code>, <code>queryInts</code>, <code>lock</code>, <code>unlock</code>, <code>begin</code></td></tr></tbody></table></div>
 <h2 id="rules-of-thumb"><a href="#rules-of-thumb">Rules of thumb</a></h2>
-<ul><li><strong>Never change a migration that has run anywhere.</strong> The runner records versions, not the scripts' contents, so it won't notice: the databases that ran the old text keep it. Add a new migration that makes the change.</li><li><strong>One change per migration</strong>, with a name that says what it does. A small migration is easy to revert and its error is easy to read.</li><li><strong>Write the down script with the up script,</strong> and run the round-trip test, so <code>down</code> works when you need it.</li><li><strong>Data is part of the schema too.</strong> A migration can <code>INSERT</code> or <code>UPDATE</code> rows (filling a new column from an old one), in the same transaction as the change that needs them.</li><li>**Keep <code>schema_migrations</code> to the runner.** Change it by hand only to repair a database, and then with the program stopped.</li><li><strong>Run migrations from one place:</strong> at start-up or as a <code>migrate up</code> command before the new build starts, not both on a schedule of their own.</li></ul>
+<ul><li><strong>Never change a migration that has run anywhere.</strong> The runner records versions, not the scripts' contents, so it won't notice: the databases that ran the old text keep it. Add a new migration that makes the change.</li><li><strong>One change per migration</strong>, with a name that says what it does. A small migration is easy to revert and its error is easy to read.</li><li><strong>Write the down script with the up script,</strong> and run the round-trip test, so <code>down</code> works when you need it.</li><li><strong>Data is part of the schema too.</strong> A migration can <code>INSERT</code> or <code>UPDATE</code> rows (filling a new column from an old one), in the same transaction as the change that needs them.</li><li>**Keep <code>schema_migrations</code> to the runner.** Change it by hand only to repair a database, and then with the program stopped.</li><li><strong>Run migrations from one place:</strong> at start-up, or as a step of the deploy before the new build starts. Not both.</li></ul>
     <nav class="pager"></nav>
   </article>
-  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#what-you-need">What you need</a></li><li><a href="#how-it-works">How it works</a></li><li><a href="#create-the-project">Create the project</a></li><li><a href="#the-first-migrations">The first migrations</a></li><li><a href="#apply-them">Apply them</a></li><li><a href="#a-migrate-command">A migrate command</a></li><li><a href="#migrating-at-start-up">Migrating at start-up</a></li><li><a href="#changes-sqlite-can-t-make-with-alter-table">Changes SQLite can&#x27;t make with ALTER TABLE</a></li><li><a href="#when-a-migration-fails">When a migration fails</a></li><li><a href="#testing-migrations">Testing migrations</a></li><li><a href="#migrations-built-into-the-binary">Migrations built into the binary</a></li><li><a href="#postgresql">PostgreSQL</a></li><li><a href="#several-instances-at-once">Several instances at once</a></li><li><a href="#branches-and-merged-migrations">Branches and merged migrations</a></li><li><a href="#a-driver-of-your-own">A driver of your own</a></li><li><a href="#reference">Reference</a></li><li><a href="#rules-of-thumb">Rules of thumb</a></li></ul></aside>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#what-you-need">What you need</a></li><li><a href="#how-it-works">How it works</a></li><li><a href="#create-the-project">Create the project</a></li><li><a href="#the-first-migrations">The first migrations</a></li><li><a href="#apply-them">Apply them</a></li><li><a href="#see-where-a-database-is">See where a database is</a></li><li><a href="#going-back">Going back</a></li><li><a href="#migrating-at-start-up">Migrating at start-up</a></li><li><a href="#changes-sqlite-can-t-make-with-alter-table">Changes SQLite can&#x27;t make with ALTER TABLE</a></li><li><a href="#when-a-migration-fails">When a migration fails</a></li><li><a href="#testing-migrations">Testing migrations</a></li><li><a href="#migrations-built-into-the-binary">Migrations built into the binary</a></li><li><a href="#postgresql">PostgreSQL</a></li><li><a href="#several-instances-at-once">Several instances at once</a></li><li><a href="#branches-and-merged-migrations">Branches and merged migrations</a></li><li><a href="#a-driver-of-your-own">A driver of your own</a></li><li><a href="#reference">Reference</a></li><li><a href="#rules-of-thumb">Rules of thumb</a></li></ul></aside>
 </div>
 <footer>
   <div class="bar">
