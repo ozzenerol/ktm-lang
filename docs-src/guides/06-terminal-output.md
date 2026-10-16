@@ -1,13 +1,15 @@
 # Terminal output
 
 Make a command-line program's output easy to read with the standard library's `term` module:
-colors, lines that say what happened, tables whose columns line up, and a progress bar. This
-guide shows each one, then puts them together in a small report. Every step is a whole program
-you can build and run.
+colors, lines that say what happened, tables whose columns line up, and a progress bar. Then read
+what people type, with line editing and a history, as GNU readline does. This guide shows each
+one, then puts them together in a small report. Every step is a whole program you can build and
+run.
 
 ## What you need
 
-Any ktm from v0.27.0. `term` is part of the standard library, so there is nothing to fetch.
+Any ktm from v0.27.0, and v0.28.0 for [reading what people type](#reading-what-people-type).
+`term` is part of the standard library, so there is nothing to fetch.
 Every program in this guide is one file, `app.ktm`, built and run like this:
 
 ```sh
@@ -302,6 +304,145 @@ At `p.done()` it is drawn full, with the time the work took, and the program goe
   and this page shows stdout first.
 - `p.add(n)` adds `n` steps, and `p.set(n)` says how many are done in all.
 
+## Reading what people type
+
+`term.readLine` shows a prompt and reads one line. On a terminal, the line can be edited with the
+keys of a shell, and Up and Down go through the lines typed before. It answers `false` when the
+input ends, so a loop over it is a whole interactive program. This one keeps a to-do list:
+
+```ktm
+import str, term, vec;
+
+i32 main() {
+    term.historyFile(".todo_history");
+    scoped vec.Vec<String> todos = vec.new<String>();
+    term.print("[bold]todo[/]: add <text>, done <n>, list, clear, exit\n");
+
+    scoped String line;
+    while (term.readLine("[cyan]todo>[/] ", &line)) {
+        u8[] cmd = str.trim(line[0:]);
+        if (str.equals(cmd, "exit")) {
+            break;
+        } else if (str.equals(cmd, "clear")) {
+            term.clear();
+        } else if (str.startsWith(cmd, "add ")) {
+            todos.push(str.from(str.trim(cmd[4:])));
+            term.success("added #%d", todos.len);
+        } else if (str.startsWith(cmd, "done ")) {
+            i64 n;
+            if (!str.toInt(str.trim(cmd[5:]), &n) || n < 1 || n > todos.len) {
+                term.error("no todo %.*s", cmd.len - 5, cmd.ptr + 5);
+                continue;
+            }
+            String gone = todos.removeAt(n - 1);
+            term.success("done: %.*s", gone.len, gone.ptr);
+            gone.free();
+        } else if (str.equals(cmd, "list")) {
+            term.Table *t = term.table("#", "TODO");
+            for (i64 i = 0; i < todos.len; i++) {
+                t.row(i + 1, todos.data[i]);
+            }
+            t.print();
+            t.free();
+        } else if (cmd.len) {
+            term.error("unknown command: %.*s", cmd.len, cmd.ptr);
+        }
+    }
+    term.print("bye\n");
+    return 0;
+}
+```
+
+```sh
+ktm app.ktm -o app
+./app
+```
+
+A session, with what was typed after each `todo>`:
+
+```output
+todo: add <text>, done <n>, list, clear, exit
+todo> add buy milk
+✓ added #1
+todo> add call the bank
+✓ added #2
+todo> list
+#  TODO
+1  buy milk
+2  call the bank
+todo> done 1
+✓ done: buy milk
+todo> done 9
+✗ no todo 9
+todo> frobnicate
+✗ unknown command: frobnicate
+todo> exit
+bye
+```
+
+- `term.readLine(prompt, &line)` puts the line in `line`, without its newline, and replaces
+  what `line` held: one `scoped String` serves the whole loop.
+- It answers `false` when the input ends: Ctrl-D on an empty line, or the end of a pipe. Typing
+  `exit` is the program's own command, as here.
+- The prompt can hold markup, like everything `term` prints.
+- Every line read goes into the history, except empty ones and a line the same as the one before.
+- `term.historyFile(path)` reads the lines saved there by earlier runs and appends each new one,
+  so Up brings back yesterday's commands too. Without it the history lasts as long as the
+  program.
+- `term.clear()` clears the screen. Ctrl-L does the same while a line is typed.
+- When stdin isn't a terminal, the lines are read as they come, with nothing to edit. The same
+  program runs a script: `printf 'add milk\nlist\n' | ./app`.
+
+The keys, as in bash and GNU readline:
+
+| Keys | What they do |
+| --- | --- |
+| Left, Right (Ctrl-B, Ctrl-F) | move one character |
+| Ctrl-Left, Ctrl-Right (Alt-B, Alt-F) | move one word |
+| Home, End (Ctrl-A, Ctrl-E) | go to the start or the end |
+| Backspace, Delete | delete the character before or under the cursor |
+| Ctrl-W, Alt-Backspace | delete the word before the cursor |
+| Ctrl-U, Ctrl-K | delete everything before or after the cursor |
+| Up, Down (Ctrl-P, Ctrl-N) | the line before or after in the history |
+| Ctrl-L | clear the screen |
+| Ctrl-C | drop the line and ask again |
+| Ctrl-D | end the input on an empty line; delete the character under the cursor otherwise |
+| Enter | the line is done |
+
+A line longer than the terminal scrolls sideways under the cursor.
+
+### Passwords and the history by hand
+
+`term.readPassword` reads a line without showing it, and never puts it in the history:
+
+```ktm
+import term;
+
+i32 main() {
+    scoped String user;
+    scoped String pass;
+    if (!term.readLine("user: ", &user) || !term.readPassword("password: ", &pass)) {
+        return 1;
+    }
+    term.success("%.*s, your password has %d characters", user.len, user.ptr, pass.len);
+    return 0;
+}
+```
+
+```output
+user: ada
+password:
+✓ ada, your password has 9 characters
+```
+
+- Nothing appears while the password is typed, not even stars. Backspace and Ctrl-U work.
+- Ctrl-C or Ctrl-D makes it answer `false`, so the program can stop.
+
+`term.historyAuto(false)` stops `readLine` from adding lines; `term.historyAdd(line)` then adds
+the ones you choose, such as the commands that worked. `term.historyMax(n)` keeps the last `n`
+lines (1000 at first), `term.historyLen()` and `term.historyAt(i)` read them, oldest first, and
+`term.historyClear()` empties the history in memory.
+
 ## Putting it together
 
 A program that checks a few services and reports on them, with each part of `term` where it
@@ -400,6 +541,12 @@ checking  ███████████████████████�
 | `t.print()` | writes the table to stdout |
 | `t.format(colors)` | the table as a new `String`; `colors` is `false` when left out |
 | `t.rows()`, `t.free()` | how many rows; frees the table |
+| `term.readLine(prompt, &line)` | reads a line, with editing and the history on a terminal; `false` at the end |
+| `term.readPassword(prompt, &line)` | reads a line without showing it, not into the history |
+| `term.clear()` | clears the terminal |
+| `term.historyFile(path)` | reads the history from a file and appends new lines to it |
+| `term.historyAdd(line)`, `term.historyAuto(on)` | add a line by hand; whether `readLine` adds them |
+| `term.historyMax(n)`, `term.historyLen()`, `term.historyAt(i)`, `term.historyClear()` | the history's size and lines |
 | `term.progress(label, total)` | a progress bar on stderr |
 | `p.add(n)`, `p.set(n)` | `n` more steps done (1 when left out); `n` steps done in all |
 | `p.done()` | the last line, with the time taken; frees the bar |
