@@ -158,6 +158,9 @@ th { font-weight: 600; }
 .install { display: flex; gap: 12px; align-items: flex-start; }
 .install pre { flex: 1 1 auto; min-width: 0; }
 .copy { font: inherit; font-size: 14px; background: none; color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 12px; cursor: pointer; }
+.copy-code { position: absolute; top: 8px; right: 8px; font-family: var(--sans); font-size: 12px; padding: 2px 8px; background: var(--bg); color: var(--muted); opacity: 0; transition: opacity 0.15s; }
+.prose pre.code:hover .copy-code, .copy-code:focus { opacity: 1; }
+@media (hover: none) { .copy-code { opacity: 1; } }
 .paths { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
 .paths li { border-bottom: 1px solid var(--line); }
 .paths a { display: grid; grid-template-columns: 9rem 1fr; gap: 16px; padding-block: 12px; color: var(--fg); }
