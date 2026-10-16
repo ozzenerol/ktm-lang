@@ -145,6 +145,36 @@ th { font-weight: 600; }
 .toc a:hover b { color: var(--accent); }
 .toc .desc { color: var(--muted); font-size: 15px; }
 
+/* ---- closable sidebars ----
+   Each toggle is a sibling of the aside it controls, not a child of it, and it
+   is always anchored to the same spot (the left or right edge of the grid, just
+   under the top bar) whether the aside is open or closed. That way closing a
+   sidebar can never also hide the control that reopens it. */
+.doc, .std { position: relative; }
+/* pinned so that display:none on a closed sidebar doesn't let the main
+   content get auto-placed into its column instead of staying in the middle */
+.doc > .chapters { grid-column: 1; }
+.doc > .prose { grid-column: 2; }
+.doc > .onpage { grid-column: 3; }
+.std > .std-left { grid-column: 1; }
+.std > .std-main { grid-column: 2; }
+.std > .std-right { grid-column: 3; }
+.side-toggle {
+  position: absolute; top: 0; z-index: 2;
+  display: flex; align-items: center; gap: 8px; min-height: 40px;
+  font: inherit; font-size: 14px; font-weight: 600; line-height: 1; white-space: nowrap;
+  background: var(--bg); color: var(--muted);
+  border: 1px solid var(--line); border-top: 0; border-radius: 0 0 10px 0;
+  padding: 11px 16px; cursor: pointer;
+}
+.side-toggle.side-toggle-r { left: auto; right: 0; border-radius: 0 0 0 10px; }
+.side-toggle:not(.side-toggle-r) { left: 0; }
+.side-toggle:hover, .side-toggle:focus-visible { color: var(--fg); background: var(--code-bg); border-color: var(--accent); }
+html.closed-chapters .doc { grid-template-columns: 0 minmax(0, 760px) 200px; }
+html.closed-onpage .doc { grid-template-columns: 220px minmax(0, 760px) 0; }
+html.closed-chapters.closed-onpage .doc { grid-template-columns: 0 minmax(0, 760px) 0; }
+html.closed-chapters .chapters, html.closed-onpage .onpage { display: none; }
+
 /* ---- home ---- */
 .home {
   max-width: 720px; margin: 0 auto; padding-block: 56px 24px; display: grid; gap: 40px;
@@ -174,12 +204,18 @@ th { font-weight: 600; }
   height: calc(100vh - var(--bar-h) - 1px);
 }
 body.wide footer { margin-top: 0; }
-.std-left, .std-right { border-right: 1px solid var(--line); overflow-y: auto; font-size: 14px; padding: 16px; }
+.std-left, .std-right { border-right: 1px solid var(--line); overflow-y: auto; font-size: 14px; padding: 48px 16px 16px; }
 .std-right { border-right: 0; border-left: 1px solid var(--line); }
 .std-left input {
   width: 100%; font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--line);
   border-radius: 4px; background: var(--bg); color: var(--fg); margin-bottom: 12px;
 }
+.std .side-toggle { border-top: 1px solid var(--line); border-radius: 0 0 8px 0; }
+.std .side-toggle.side-toggle-r { border-radius: 0 0 0 8px; }
+html.closed-std-left .std { grid-template-columns: 0 minmax(0, 1fr) 240px; }
+html.closed-std-right .std { grid-template-columns: 260px minmax(0, 1fr) 0; }
+html.closed-std-left.closed-std-right .std { grid-template-columns: 0 minmax(0, 1fr) 0; }
+html.closed-std-left .std-left, html.closed-std-right .std-right { display: none; }
 .std-left h4, .std-right h4 { margin: 16px 0 4px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .std-left h4:first-child, .std-right h4:first-child { margin-top: 0; }
 .std-left ul, .std-right ul { list-style: none; margin: 0; padding: 0; }
@@ -211,15 +247,19 @@ body.wide footer { margin-top: 0; }
 
 @media (max-width: 1100px) {
   .doc { grid-template-columns: 200px minmax(0, 1fr); }
-  .onpage { display: none; }
+  .onpage, .side-toggle.side-toggle-r { display: none; }
   .std { grid-template-columns: 240px minmax(0, 1fr); }
   .std-right { display: none; }
+  html.closed-chapters .doc { grid-template-columns: 0 minmax(0, 1fr); }
+  html.closed-std-left .std { grid-template-columns: 0 minmax(0, 1fr); }
 }
 @media (max-width: 760px) {
   .doc { grid-template-columns: minmax(0, 1fr); gap: 24px; padding-block: 24px; }
-  .chapters { position: static; max-height: none; }
+  .doc > .chapters, .doc > .prose, .doc > .onpage { grid-column: auto; }
+  .chapters { position: relative; top: 0; max-height: none; }
   .chapters ol { display: flex; flex-wrap: wrap; gap: 4px 14px; }
   .chapters .num { display: none; }
+  html.closed-chapters .doc { grid-template-columns: minmax(0, 1fr); }
   .search { margin-left: 0; order: 5; flex: 1 1 100%; }
   .search input { width: 100%; }
   .paths a, .toc a { grid-template-columns: 1fr; gap: 0; }
