@@ -42,9 +42,11 @@ i32 main() {
 
     fs.writeAll("__907_prog.ktm",
         "import term;\n"
-        "i32 main() {\n"
+        "i32 main(i32 argc, u8 **argv) {\n"
         "    scoped String line;\n"
-        "    while (term.readLine(\"> \", &line)) {\n"
+        "    u8[] prompt = \"> \";\n"
+        "    if (argc > 1) { prompt = \"[bold]top[/]\\n\"; }\n"
+        "    while (term.readLine(prompt, &line)) {\n"
         "        printf(\"got [%.*s]\\n\", line.len, line.ptr);\n"
         "    }\n"
         "    printf(\"bye %d\\n\", term.historyLen());\n"
@@ -79,6 +81,23 @@ i32 main() {
     check(order, "editing keys and the history on a terminal");
     if (!order) {
         printf("  got: [%.*s]\n", typed.len, typed.ptr);
+    }
+
+    /* a prompt that ends its line: written once a line, not once a key */
+    fs.writeAll("__907_run.sh",
+        "keys() { sleep 1; printf 'hello\\r'; sleep 0.5; printf '\\004'; sleep 0.5; }\n"
+        "keys | if script -V >/dev/null 2>&1; then script -qfec './__907_prog x' /dev/null;\n"
+        "else script -q /dev/null ./__907_prog x; fi\n");
+    scoped String two = proc.shellOutput(RUN " 2>&1");
+    i64 tops = 0;
+    for (i64 at = str.find(two[0:], "top"); at >= 0; ) {
+        tops++;
+        i64 next = str.find(two[at + 3:], "top");
+        at = next < 0 ? -1 : at + 3 + next;
+    }
+    check(tops == 2 && str.contains(two[0:], "got [hello]"), "a prompt of two lines");
+    if (tops != 2) {
+        printf("  %d prompts: [%.*s]\n", tops, two.len, two.ptr);
     }
 
     fs.remove("__907_run.sh");
