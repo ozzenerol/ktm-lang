@@ -97,8 +97,9 @@ bool uncaught(u8 *src, bool jit, u8 *want) {
     "  at " UE_SRC ":4 in at\n"                            \
     "  called from " UE_SRC ":9 in main\n"
 
-/* thrown on from a catch: the calls are those of the throw(e), which
- * leaves the catch at its closing brace (where e is freed) */
+/* thrown on from a catch: the calls are those of the throw(e), from its
+ * own line (v0.28.1; before, the catch's closing brace, where e is freed
+ * and the throw went on) */
 #define AGAIN "void inner()\n"                              \
     "{\n"                                                   \
     "    throw(5, \"inner\");\n"                            \
@@ -118,7 +119,7 @@ bool uncaught(u8 *src, bool jit, u8 *want) {
     "    return 0;\n"                                       \
     "}\n"
 #define AGAIN_ERR "uncaught error 5: inner (" UE_SRC ":3)\n" \
-    "  at " UE_SRC ":12 in outer\n"                        \
+    "  at " UE_SRC ":11 in outer\n"                        \
     "  called from " UE_SRC ":16 in main\n"
 
 i32 main() {
