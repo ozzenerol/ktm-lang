@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Command-line flags - ktm</title>
-
+<meta name="description" content="Read flags like --port 9000 and -v from the command line with the standard library&#x27;s flag module. This guide builds one program, serve, a step at a time: one flag, then the four kinds of flag and their short names, the ways to write them, the arguments that aren&#x27;t flags, checking values, a fallback to an environment variable and your own error messages. The last section builds a second program with subcommands, like git commit. Every step is a whole program you can build and run.">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="../assets/style.css">
 <script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
@@ -32,7 +32,7 @@
   <aside class="chapters" aria-label="Chapters"><h4>Quick Guides</h4><ol><li><a href="01-database-migrations.html"><span class="num">1</span>Database migrations</a></li><li><a href="02-logging.html"><span class="num">2</span>Logging</a></li><li><a href="03-sqlite.html"><span class="num">3</span>SQLite</a></li><li><a href="04-postgresql.html"><span class="num">4</span>PostgreSQL</a></li><li><a href="05-flags.html" class="on"><span class="num">5</span>Command-line flags</a></li><li><a href="06-terminal-output.html"><span class="num">6</span>Terminal output</a></li></ol></aside>
   <article class="prose">
 <h1>Command-line flags</h1>
-<p>Read flags like <code>--port 9000</code> and <code>-v</code> from the command line with the standard library's <code>flag</code> module. This guide builds one program, <code>serve</code>, a step at a time: one flag, then the four kinds of flag and their short names, the ways to write them, the arguments that aren't flags, checking values, a fallback to an environment variable and your own error messages. The last section builds a second program with subcommands, like <code>git commit</code>. Every step is a whole program you can build and run.</p>
+<p class="lede">Read flags like <code>--port 9000</code> and <code>-v</code> from the command line with the standard library's <code>flag</code> module. This guide builds one program, <code>serve</code>, a step at a time: one flag, then the four kinds of flag and their short names, the ways to write them, the arguments that aren't flags, checking values, a fallback to an environment variable and your own error messages. The last section builds a second program with subcommands, like <code>git commit</code>. Every step is a whole program you can build and run.</p>
 <h2 id="what-you-need"><a href="#what-you-need">What you need</a></h2>
 <p>Any ktm. <code>flag</code> is part of the standard library, so there is nothing to fetch. Every <code>serve</code> program in this guide is one file, <code>serve.ktm</code>, built like this:</p>
 <pre class="code"><code>ktm serve.ktm -o serve</code></pre>

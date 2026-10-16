@@ -132,7 +132,7 @@ def convert(text):
         nonlocal para, items, list_kind, rows, lede
         if para:
             joined = " ".join(l.strip() for l in para)
-            if title and not lede and not toc and not out:
+            if title and not lede and len(out) == 1 and out[0].startswith("<h1>"):
                 lede = re.sub(r"<[^>]+>", "", inline(joined))
                 out.append(f'<p class="lede">{inline(joined)}</p>')
             else:
