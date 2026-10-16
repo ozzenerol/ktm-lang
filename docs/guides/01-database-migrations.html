@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Database migrations - ktm</title>
-
+<meta name="description" content="Keep a database&#x27;s schema in numbered SQL files and let your program bring any database up to date with ktm-migrate. This guide builds a small notes program on SQLite, step by step: the first migrations, status, going back, migrating at start-up, changes SQLite can&#x27;t make with ALTER TABLE, failures, tests and migrations built into the binary. Then the same program on PostgreSQL, several instances starting at once, migrations from merged branches, and a driver of your own.">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="../assets/style.css">
 <script>try {
@@ -29,7 +29,7 @@
       <kbd>/</kbd>
       <ul id="site-results" class="results" hidden></ul>
     </div>
-    <span class="ver">v0.27.0</span>
+    <span class="ver">v0.27.1</span>
     <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
   </div>
 </header>
@@ -38,7 +38,7 @@
   <aside class="chapters" aria-label="Chapters"><h4>Quick Guides</h4><ol><li><a href="01-database-migrations.html" class="on"><span class="num">1</span>Database migrations</a></li><li><a href="02-logging.html"><span class="num">2</span>Logging</a></li><li><a href="03-sqlite.html"><span class="num">3</span>SQLite</a></li><li><a href="04-postgresql.html"><span class="num">4</span>PostgreSQL</a></li><li><a href="05-flags.html"><span class="num">5</span>Command-line flags</a></li><li><a href="06-terminal-output.html"><span class="num">6</span>Terminal output</a></li></ol></aside>
   <article class="prose">
 <h1>Database migrations</h1>
-<p>Keep a database's schema in numbered SQL files and let your program bring any database up to date with <a href="https://github.com/ozzenerol/ktm-migrate">ktm-migrate</a>. This guide builds a small notes program on SQLite, step by step: the first migrations, status, going back, migrating at start-up, changes SQLite can't make with <code>ALTER TABLE</code>, failures, tests and migrations built into the binary. Then the same program on PostgreSQL, several instances starting at once, migrations from merged branches, and a driver of your own.</p>
+<p class="lede">Keep a database's schema in numbered SQL files and let your program bring any database up to date with <a href="https://github.com/ozzenerol/ktm-migrate">ktm-migrate</a>. This guide builds a small notes program on SQLite, step by step: the first migrations, status, going back, migrating at start-up, changes SQLite can't make with <code>ALTER TABLE</code>, failures, tests and migrations built into the binary. Then the same program on PostgreSQL, several instances starting at once, migrations from merged branches, and a driver of your own.</p>
 <h2 id="what-you-need"><a href="#what-you-need">What you need</a></h2>
 <ul><li><strong>ktm 0.24 or newer.</strong> ktm-migrate v0.1.1 needs it.</li><li><strong>For SQLite, a ktm built with SQLite.</strong> The <code>sql</code> module, which the SQLite driver uses, is only in a ktm built from source with <code>--sqlite</code>. The release zips don't have it. You need sqlite3 and its headers (<code>libsqlite3-dev</code> on Debian and Ubuntu; macOS has them):</li></ul>
 <pre class="code"><code>git clone https://github.com/ozzenerol/ktm-lang &amp;&amp; cd ktm-lang
@@ -675,7 +675,7 @@ unlock</code></pre>
 </div>
 <footer>
   <div class="bar">
-    <span>ktm v0.27.0</span>
+    <span>ktm v0.27.1</span>
     <a href="../releases.html">Releases</a>
     <a href="../known-issues.html">Known issues</a>
     <a href="../roadmap.html">Roadmap</a>

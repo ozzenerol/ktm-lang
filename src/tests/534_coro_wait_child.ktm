@@ -1,4 +1,4 @@
-import coro, date, libc, os, proc, test;
+import coro, date, fs, libc, os, proc, str, test;
 
 /* coro.waitChild (v0.6.0): children waited for inside the loop, several
  * at once from several coroutines, without blocking the others; a
@@ -24,15 +24,26 @@ proc.Proc *sh(u8 *script) {
 
 i32 gStatus[3];
 i64 gEnded[3];
+/* marker files that chain the children's exits: 1, then 2, then 0 */
+String gMark1, gMark2;
 i64 gTicks = 0;
 bool gWaiting = true;
 
 void *waiter(void *arg) {
     i64 i = (i64)arg;
     proc.Proc *p;
-    if (i == 0) { p = sh("sleep 0.3; exit 3"); }
-    else if (i == 1) { p = sh("sleep 0.1; exit 4"); }
-    else { p = sh("sleep 0.2; kill -TERM $$"); }
+    /* each child ends 100 ms after the one before it, however slowly the
+     * shells start (a fixed sleep each once raced on a loaded arm64 box) */
+    scoped String script;
+    if (i == 0) {
+        script = str.format("until [ -e %s ]; do sleep 0.02; done; sleep 0.1; exit 3", gMark2);
+    } else if (i == 1) {
+        script = str.format("sleep 0.1; touch %s; exit 4", gMark1);
+    } else {
+        script = str.format("until [ -e %s ]; do sleep 0.02; done; sleep 0.1; touch %s; kill -TERM $$",
+                            gMark1, gMark2);
+    }
+    p = sh(script.cstr());
     gStatus[i] = coro.waitChild(p.pid);
     gEnded[i] = date.monoMs();
     proc.setStatus(p, gStatus[i]);
@@ -88,6 +99,8 @@ void *edges(void *arg) {
 i32 main() {
     printf("Test - coro.waitChild: ");
 
+    gMark1 = str.format("/tmp/__534_%d_1", libc.getpid());
+    gMark2 = str.format("/tmp/__534_%d_2", libc.getpid());
     i64 t0 = date.monoMs();
     for (i64 i = 0; i < 3; i++) { coro.go(&waiter, (void *)i); }
     coro.go(&ticker);
@@ -99,6 +112,8 @@ i32 main() {
     check(proc.exited(gStatus[1]) && proc.exitCode(gStatus[1]) == 4, "second child: exit 4");
     check(gStatus[2] >= 0 && proc.signaled(gStatus[2]) && proc.termSignal(gStatus[2]) == 15,
           "third child: SIGTERM, and proc.setStatus records it");
+    fs.remove(gMark1[0:]);
+    fs.remove(gMark2[0:]);
     check(gEnded[1] < gEnded[2] && gEnded[2] < gEnded[0], "each waiter wakes when its child ends");
     check(gEnded[0] - t0 < 1500, "the waits overlap");
     check(gTicks >= 15, "the loop keeps running while children are waited for");

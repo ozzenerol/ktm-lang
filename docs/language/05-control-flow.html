@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Control flow - ktm</title>
-
+<meta name="description" content="if and else, the three loops, the range-based for, break and continue, and goto. switch has its own chapter.">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="../assets/style.css">
 <script>try {
@@ -29,7 +29,7 @@
       <kbd>/</kbd>
       <ul id="site-results" class="results" hidden></ul>
     </div>
-    <span class="ver">v0.27.0</span>
+    <span class="ver">v0.27.1</span>
     <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
   </div>
 </header>
@@ -38,7 +38,7 @@
   <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html" class="on"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-scoped.html"><span class="num">16</span>defer and scoped</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li><li><a href="23-attributes.html"><span class="num">23</span>Attributes</a></li><li><a href="24-reflection.html"><span class="num">24</span>Reflection</a></li><li><a href="25-preprocessor.html"><span class="num">25</span>The preprocessor</a></li><li><a href="26-calling-c.html"><span class="num">26</span>Calling C</a></li><li><a href="27-threads-and-threadlocal.html"><span class="num">27</span>Threads and threadlocal</a></li><li><a href="28-inline-assembly.html"><span class="num">28</span>Inline assembly</a></li><li><a href="29-safety-and-debugging.html"><span class="num">29</span>Safety and debugging</a></li></ol></aside>
   <article class="prose">
 <h1>Control flow</h1>
-<p><code>if</code> and <code>else</code>, the three loops, the range-based <code>for</code>, <code>break</code> and <code>continue</code>, and <code>goto</code>. <a href="06-switch.html">switch</a> has its own chapter.</p>
+<p class="lede"><code>if</code> and <code>else</code>, the three loops, the range-based <code>for</code>, <code>break</code> and <code>continue</code>, and <code>goto</code>. <a href="06-switch.html">switch</a> has its own chapter.</p>
 <h2 id="braces-are-required"><a href="#braces-are-required">Braces are required</a></h2>
 <p>The body of <code>if</code>, <code>else</code>, <code>for</code>, <code>while</code> and <code>do</code> is always a block in braces, even when it is one statement. <code>else if</code> is the one exception. This rules out a whole class of bugs where a second line looks guarded but isn't.</p>
 <pre class="code bad"><span class="tag">does not compile</span><code><span class="t">void</span> main() {
@@ -255,7 +255,7 @@ k = 3</code></pre>
 <pre class="out"><code>nums[1] + nums[3] = 12</code></pre>
 <h2 id="the-range-based-for"><a href="#the-range-based-for">The range-based for</a></h2>
 <p><code>for (T x : items)</code> runs once per element, in order. It works on:</p>
-<ul><li>fixed-size arrays,</li><li>slices (<code>T[]</code>), <code>String</code>s included,</li><li>any struct with <code>data</code> and <code>len</code> fields (or <code>entries</code> and <code>size</code>), such as <a href="../std/index.html#vec/vec.Vec">vec.Vec</a>.</li></ul>
+<ul><li>fixed-size arrays,</li><li>slices (<code>T[]</code>), <code>String</code>s included,</li><li>any struct with <code>data</code> and <code>len</code> fields (or <code>entries</code> and <code>size</code>), such as <a href="../std/index.html#vec/vec.Vec">vec.Vec</a>,</li><li>a <a href="../std/index.html#map/map.Map">map.Map</a>: each entry, in the order the keys were added.</li></ul>
 <pre class="code run"><code><span class="k">import</span> vec;
 
 <span class="t">void</span> main() {
@@ -284,6 +284,22 @@ k = 3</code></pre>
 <pre class="out"><code>sum = 28
 [k][t][m]
 1.5 2.5 </code></pre>
+<p>Over a map, the loop variable is an entry, with the key in <code>.key</code> and the value in <code>.value</code>. Deleted keys are skipped:</p>
+<pre class="code run"><code><span class="k">import</span> map;
+
+<span class="t">void</span> main() {
+    map.Map&lt;<span class="t">u8</span>[], <span class="t">i64</span>&gt; stock = map.new&lt;<span class="t">u8</span>[], <span class="t">i64</span>&gt;();
+    stock.set(<span class="s">&quot;apples&quot;</span>, <span class="n">12</span>);
+    stock.set(<span class="s">&quot;pears&quot;</span>, <span class="n">0</span>);
+    stock.set(<span class="s">&quot;plums&quot;</span>, <span class="n">7</span>);
+    stock.delete(<span class="s">&quot;pears&quot;</span>);
+    <span class="k">for</span> (<span class="k">auto</span> e : stock) {
+        printf(<span class="s">&quot;%.*s: %d\n&quot;</span>, e.key.len, e.key.ptr, e.value);
+    }
+    stock.free();
+}</code></pre>
+<pre class="out"><code>apples: 12
+plums: 7</code></pre>
 <p>The loop variable is a copy of the element. Changing it changes nothing in the array; to change the elements, loop over the index:</p>
 <pre class="code run"><code><span class="t">void</span> main() {
     <span class="t">i64</span> nums[] = {<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>};
@@ -346,7 +362,7 @@ done</code></pre>
 </div>
 <footer>
   <div class="bar">
-    <span>ktm v0.27.0</span>
+    <span>ktm v0.27.1</span>
     <a href="../releases.html">Releases</a>
     <a href="../known-issues.html">Known issues</a>
     <a href="../roadmap.html">Roadmap</a>

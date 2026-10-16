@@ -339,7 +339,8 @@ nums[1] + nums[3] = 12
 - fixed-size arrays,
 - slices (`T[]`), `String`s included,
 - any struct with `data` and `len` fields (or `entries` and `size`), such as
-  [vec.Vec](../std/index.html#vec/vec.Vec).
+  [vec.Vec](../std/index.html#vec/vec.Vec),
+- a [map.Map](../std/index.html#map/map.Map): each entry, in the order the keys were added.
 
 ```ktm run
 import vec;
@@ -373,6 +374,30 @@ void main() {
 sum = 28
 [k][t][m]
 1.5 2.5 
+```
+
+Over a map, the loop variable is an entry, with the key in `.key` and the value in `.value`.
+Deleted keys are skipped:
+
+```ktm run
+import map;
+
+void main() {
+    map.Map<u8[], i64> stock = map.new<u8[], i64>();
+    stock.set("apples", 12);
+    stock.set("pears", 0);
+    stock.set("plums", 7);
+    stock.delete("pears");
+    for (auto e : stock) {
+        printf("%.*s: %d\n", e.key.len, e.key.ptr, e.value);
+    }
+    stock.free();
+}
+```
+
+```output
+apples: 12
+plums: 7
 ```
 
 The loop variable is a copy of the element. Changing it changes nothing in the array; to change the

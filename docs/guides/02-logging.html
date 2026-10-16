@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Logging - ktm</title>
-
+<meta name="description" content="Write what a program does to stderr, to stdout or to a file, with the standard library&#x27;s log module. This guide starts with one line and adds a step at a time: levels, a level from the environment, a log file, where each line came from, rotation, a second log of your own, threads, and the access log of an HTTP server. Every step is a whole program you can build and run.">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="../assets/style.css">
 <script>try {
@@ -29,7 +29,7 @@
       <kbd>/</kbd>
       <ul id="site-results" class="results" hidden></ul>
     </div>
-    <span class="ver">v0.27.0</span>
+    <span class="ver">v0.27.1</span>
     <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
   </div>
 </header>
@@ -38,7 +38,7 @@
   <aside class="chapters" aria-label="Chapters"><h4>Quick Guides</h4><ol><li><a href="01-database-migrations.html"><span class="num">1</span>Database migrations</a></li><li><a href="02-logging.html" class="on"><span class="num">2</span>Logging</a></li><li><a href="03-sqlite.html"><span class="num">3</span>SQLite</a></li><li><a href="04-postgresql.html"><span class="num">4</span>PostgreSQL</a></li><li><a href="05-flags.html"><span class="num">5</span>Command-line flags</a></li><li><a href="06-terminal-output.html"><span class="num">6</span>Terminal output</a></li></ol></aside>
   <article class="prose">
 <h1>Logging</h1>
-<p>Write what a program does to stderr, to stdout or to a file, with the standard library's <code>log</code> module. This guide starts with one line and adds a step at a time: levels, a level from the environment, a log file, where each line came from, rotation, a second log of your own, threads, and the access log of an HTTP server. Every step is a whole program you can build and run.</p>
+<p class="lede">Write what a program does to stderr, to stdout or to a file, with the standard library's <code>log</code> module. This guide starts with one line and adds a step at a time: levels, a level from the environment, a log file, where each line came from, rotation, a second log of your own, threads, and the access log of an HTTP server. Every step is a whole program you can build and run.</p>
 <h2 id="what-you-need"><a href="#what-you-need">What you need</a></h2>
 <p>Any ktm. <code>log</code> is part of the standard library, so there is nothing to fetch. Every program in this guide is one file, <code>app.ktm</code>, built and run like this:</p>
 <pre class="code"><code>ktm app.ktm -o app
@@ -387,7 +387,7 @@ curl localhost:8080/nope</code></pre>
 </div>
 <footer>
   <div class="bar">
-    <span>ktm v0.27.0</span>
+    <span>ktm v0.27.1</span>
     <a href="../releases.html">Releases</a>
     <a href="../known-issues.html">Known issues</a>
     <a href="../roadmap.html">Roadmap</a>
