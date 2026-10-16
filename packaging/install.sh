@@ -14,6 +14,8 @@
 #                                    (net.tls: mbedTLS, for the programs
 #                                     that import it)
 #   <prefix>/share/ktm/vim/         (Vim/Neovim syntax, filetype, ftplugin)
+#   <prefix>/share/man/man3, man7   (the guide and the library as man
+#                                     pages, ktm*.3 and ktm*.7: Linux)
 #
 # Two deliberate details, both load-bearing:
 #
@@ -89,6 +91,10 @@ if [ "$UNINSTALL" -eq 1 ]; then
     if [ -d "$PREFIX/share/ktm/vim" ]; then
         rm -rf "$PREFIX/share/ktm/vim" && echo "removed $PREFIX/share/ktm/vim"
     fi
+    if [ -e "$PREFIX/share/man/man7/ktm.7" ]; then
+        rm -f "$PREFIX"/share/man/man3/ktm-*.3 "$PREFIX"/share/man/man7/ktm.7 "$PREFIX"/share/man/man7/ktm-*.7
+        echo "removed the ktm man pages from $PREFIX/share/man"
+    fi
     # the standard library's modules (the ones this archive has; other
     # modules under $PREFIX/modules stay)
     for d in "$SRC"/modules/*/; do
@@ -148,6 +154,16 @@ if [ -d "$SRC/vim" ] && mkdir -p "$PREFIX/share/ktm" 2>/dev/null; then
     cp -R "$SRC/vim" "$PREFIX/share/ktm/vim"
     chmod -R u=rwX,go=rX "$PREFIX/share/ktm/vim"
     echo "installed $PREFIX/share/ktm/vim"
+fi
+# the man pages (a Linux archive has them): every ktm page replaced, so a
+# module or chapter that went leaves none behind
+if [ -d "$SRC/man" ] && mkdir -p "$PREFIX/share/man/man3" "$PREFIX/share/man/man7" 2>/dev/null; then
+    for s in 3 7; do
+        rm -f "$PREFIX/share/man/man$s/ktm.$s" "$PREFIX/share/man/man$s"/ktm-*.$s
+        cp "$SRC/man/man$s"/*.$s "$PREFIX/share/man/man$s/"
+        chmod 644 "$PREFIX/share/man/man$s"/ktm*.$s
+    done
+    echo "installed the man pages into $PREFIX/share/man (man ktm)"
 fi
 
 # Downloaded archives carry com.apple.quarantine, which makes the

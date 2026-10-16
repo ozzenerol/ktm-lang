@@ -3,6 +3,50 @@
 macOS are attached to each release on
 <a href="https://github.com/ozzenerol/ktm-lang/releases">GitHub</a>.</p>
 
+<h2>v0.26.0 <small>(2026-10-16)</small></h2>
+<p>SQLite with arguments and structs, go-to-definition into packages, man pages, and Quick Guides.</p>
+
+<h3>SQLite: queries with arguments, rows into structs</h3>
+<ul>
+  <li><code>db.exec(query, args...)</code> runs one statement with its <code>?</code>s filled from the
+  arguments and answers how many rows it changed. An argument can be an integer, <code>bool</code>,
+  enum (stored by name), float, text (<code>u8[]</code>, <code>String</code>, <code>u8 *</code>),
+  <code>sql.blob(bytes)</code>, a struct or slice (as JSON), or a pointer to one of them; a null pointer
+  is NULL.</li>
+  <li><code>sql.queryAll&lt;T&gt;(db, query, args...)</code> returns every row as a
+  <code>vec.Vec&lt;T&gt;</code>, <code>sql.queryOne&lt;T&gt;</code> the first (<code>sql.ERR_NO_ROWS</code>
+  when there is none). Columns fill a struct's fields by name (<code>@key</code>, <code>@skip</code>);
+  a pointer field is null for NULL; any other <code>T</code> takes the first column, so
+  <code>sql.queryOne&lt;i64&gt;(db, "INSERT ... RETURNING id", ...)</code> gives the new id.
+  <code>sql.free(reflect.of(x))</code> frees what they allocated.</li>
+  <li>Failures throw <code>sql.ERR_SQL</code> with SQLite's message; <code>db.errorCode()</code> tells
+  a broken constraint apart (<code>sql.CONSTRAINT_UNIQUE</code>, <code>NOTNULL</code>,
+  <code>FOREIGNKEY</code>, <code>CHECK</code>, <code>PRIMARYKEY</code>). <code>db.lastInsertId()</code>
+  is the last row's id.</li>
+  <li>The <code>sql.Param</code>, <code>sql.select</code> and prepared-statement calls work as before.
+  The <a href="guides/03-sqlite.html">SQLite guide</a> uses the new calls.</li>
+</ul>
+
+<h3>LSP</h3>
+<ul>
+  <li>Go to definition and hover reach a package's names: <code>pg.connect</code>,
+  <code>pg.Conn</code>, a sub-package (<code>postgres.driver</code>) and an import under another name.
+  Before, only the standard library's and methods on a package's types did.</li>
+  <li>Go to definition reaches generic functions: <code>vec.new&lt;i64&gt;</code>,
+  <code>json.decode&lt;T&gt;</code>, <code>pg.queryAll&lt;T&gt;</code>.</li>
+  <li>Hover shows a package's names as the code writes them (<code>pg.Conn *pg.connect(...)</code>),
+  not the compiler's internal path. A package under a <code>replace</code> opens at its real path.</li>
+</ul>
+
+<h3>Documentation</h3>
+<ul>
+  <li><code>man ktm</code>: the language guide and the standard library as man pages
+  (<code>ktm-&lt;module&gt;(3)</code>, <code>ktm-guide-&lt;chapter&gt;(7)</code>), installed on Linux.</li>
+  <li><a href="guides/index.html">Quick Guides</a>: one task each, from an empty directory to a
+  working program: database migrations, logging, SQLite and PostgreSQL. Every code block has a Copy
+  button.</li>
+</ul>
+
 <h2>v0.25.0 <small>(2026-10-15)</small></h2>
 <p>Two changes to the language that make a program that compiled before fail to: both say what to
 write instead.</p>

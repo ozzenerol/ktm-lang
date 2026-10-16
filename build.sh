@@ -206,6 +206,15 @@ if [ "$DO_INSTALL" = 1 ]; then
     ${as[@]+"${as[@]}"} rm -rf "$INSTALL_PREFIX/share/ktm/vim"
     ${as[@]+"${as[@]}"} mkdir -p "$INSTALL_PREFIX/share/ktm"
     ${as[@]+"${as[@]}"} cp -R "$ROOT/src/syntax-highlighting/vim" "$INSTALL_PREFIX/share/ktm/vim"
+    # The guide and the library as man pages, `man ktm` (Linux only for now):
+    # every ktm page replaced, so a module or chapter that went leaves none behind
+    if [ "$(uname -s)" = Linux ]; then
+        for s in 3 7; do
+            ${as[@]+"${as[@]}"} mkdir -p "$INSTALL_PREFIX/share/man/man$s"
+            ${as[@]+"${as[@]}"} rm -f "$INSTALL_PREFIX/share/man/man$s/ktm.$s" "$INSTALL_PREFIX/share/man/man$s"/ktm-*.$s
+            ${as[@]+"${as[@]}"} cp "$ROOT/man/man$s"/*.$s "$INSTALL_PREFIX/share/man/man$s/"
+        done
+    fi
 fi
 
 step "Done"

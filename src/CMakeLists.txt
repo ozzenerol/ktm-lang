@@ -176,5 +176,10 @@ install(TARGETS ktm DESTINATION bin)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/std/ DESTINATION modules)
 # Vim/Neovim syntax, filetype and ftplugin: `set rtp+=<prefix>/share/ktm/vim`
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/syntax-highlighting/vim/ DESTINATION share/ktm/vim)
+# The language guide and the standard library as man pages (docs-src/tools/build.py
+# writes them): `man ktm`. Linux only for now.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    install(DIRECTORY ${CMAKE_SOURCE_DIR}/../man/ DESTINATION share/man)
+endif()
 # ${CMAKE_INSTALL_PREFIX} escaped: the prefix at install time (`cmake --install --prefix`)
 install(CODE "execute_process(COMMAND \"\${CMAKE_INSTALL_PREFIX}/bin/ktm\" -fPIC -lib ktm --install-dir=\${CMAKE_INSTALL_PREFIX} \${CMAKE_INSTALL_PREFIX}/modules)")
