@@ -35,21 +35,19 @@
 <p>Keep a database's schema in numbered SQL files and let your program bring any database up to date with <a href="https://github.com/ozzenerol/ktm-migrate">ktm-migrate</a>. This guide builds a small notes program on SQLite, step by step: the first migrations, status, going back, migrating at start-up, changes SQLite can't make with <code>ALTER TABLE</code>, failures, tests and migrations built into the binary. Then the same program on PostgreSQL, several instances starting at once, migrations from merged branches, and a driver of your own.</p>
 <h2 id="what-you-need"><a href="#what-you-need">What you need</a></h2>
 <ul><li><strong>ktm 0.24 or newer.</strong> ktm-migrate v0.1.1 needs it.</li><li><strong>For SQLite, a ktm built with SQLite.</strong> The <code>sql</code> module, which the SQLite driver uses, is only in a ktm built from source with <code>--sqlite</code>. The release zips don't have it. You need sqlite3 and its headers (<code>libsqlite3-dev</code> on Debian and Ubuntu; macOS has them):</li></ul>
-<pre class="code"><code>$ git clone https://github.com/ozzenerol/ktm-lang &amp;&amp; cd ktm-lang
-$ ./build.sh --sqlite --install</code></pre>
+<pre class="code"><code>git clone https://github.com/ozzenerol/ktm-lang &amp;&amp; cd ktm-lang
+./build.sh --sqlite --install</code></pre>
 <ul><li><strong>For PostgreSQL, any ktm.</strong> The driver uses the <a href="https://github.com/ozzenerol/ktm-pg">ktm-pg</a> package. The <a href="#postgresql">PostgreSQL</a> section starts from here too.</li></ul>
 <p>On a ktm without SQLite, importing the SQLite driver stops the build with this message:</p>
 <pre class="out"><code>Error: ktm-migrate/sqlite needs ktm built with SQLite (./build.sh --sqlite)</code></pre>
 <h2 id="how-it-works"><a href="#how-it-works">How it works</a></h2>
 <ul><li>A <strong>migration</strong> is a version number, a name, an <em>up</em> script that makes a change and, optionally, a <em>down</em> script that undoes it.</li><li>The database keeps the versions that ran in a table, <code>schema_migrations (version, name, applied_at)</code>. The runner creates it the first time.</li><li><code>up</code> runs every migration the table doesn't have, in version order. A database that is already up to date gets nothing. The same program can migrate an empty database or last month's.</li><li>Each migration runs in a transaction together with its row in <code>schema_migrations</code>. It happens whole or not at all.</li><li>A lock keeps two instances of a program that start together from both migrating.</li></ul>
 <h2 id="create-the-project"><a href="#create-the-project">Create the project</a></h2>
-<pre class="code"><code>$ mkdir notes &amp;&amp; cd notes
-$ ktm mod init example.com/me/notes
-ktm: created ktm.mod for example.com/me/notes
-$ ktm get github.com/ozzenerol/ktm-migrate
-ktm: added github.com/ozzenerol/ktm-migrate v0.1.1
-$ cat ktm.mod
-module example.com/me/notes
+<pre class="code"><code>mkdir notes &amp;&amp; cd notes
+ktm mod init example.com/me/notes
+ktm get github.com/ozzenerol/ktm-migrate</code></pre>
+<p><code>ktm.mod</code> now requires the package:</p>
+<pre class="code"><code>module example.com/me/notes
 
 ktm 0.25
 
@@ -111,15 +109,15 @@ DROP TABLE tags;</code></pre>
     printf(<span class="s">&quot;%d migration(s) applied, version %d\n&quot;</span>, n, migrate.version(&amp;d));
     <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
-<pre class="code"><code>$ ktm build
-$ ./notes
-2 migration(s) applied, version 2
-$ ./notes
-0 migration(s) applied, version 2</code></pre>
+<pre class="code"><code>ktm build
+./notes</code></pre>
+<pre class="out"><code>2 migration(s) applied, version 2</code></pre>
+<pre class="code"><code>./notes</code></pre>
+<pre class="out"><code>0 migration(s) applied, version 2</code></pre>
 <ul><li><code>migrate.load(dir)</code> reads every migration in <code>dir</code>, sorted by version. The path is relative to the directory the program runs in, so run it from the project, or <a href="#migrations-built-into-the-binary">build the migrations into the binary</a>.</li><li><code>sqlite.driver(db)</code> makes a <code>migrate.Driver</code>: what the runner uses to talk to the database. The database stays yours, so close it yourself, after the last migration call.</li><li><code>ms.up(&amp;d)</code> returns how many migrations ran. The second run has nothing to do.</li><li><code>migrate.version(&amp;d)</code> is the newest applied version, <code>0</code> for an empty database.</li><li><code>ms.free()</code> frees what <code>load</code> read.</li></ul>
 <p>The <code>sqlite3</code> shell shows what happened:</p>
-<pre class="code"><code>$ sqlite3 notes.db &#x27;SELECT * FROM schema_migrations&#x27;
-1|create_notes|2026-10-16 01:58:02
+<pre class="code"><code>sqlite3 notes.db &#x27;SELECT * FROM schema_migrations&#x27;</code></pre>
+<pre class="out"><code>1|create_notes|2026-10-16 01:58:02
 2|create_tags|2026-10-16 01:58:02</code></pre>
 <h2 id="see-where-a-database-is"><a href="#see-where-a-database-is">See where a database is</a></h2>
 <p><code>ms.status(&amp;d)</code> lists every migration and whether the database has it. This <code>main.ktm</code> applies what is pending, then prints the list:</p>
@@ -148,13 +146,13 @@ $ ./notes
     }
     <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
-<pre class="code"><code>$ ktm build
-$ ./notes
-2 migration(s) applied, version 2
+<pre class="code"><code>ktm build
+./notes</code></pre>
+<pre class="out"><code>2 migration(s) applied, version 2
    1  applied  create_notes
-   2  applied  create_tags
-$ ./notes
-0 migration(s) applied, version 2
+   2  applied  create_tags</code></pre>
+<pre class="code"><code>./notes</code></pre>
+<pre class="out"><code>0 migration(s) applied, version 2
    1  applied  create_notes
    2  applied  create_tags</code></pre>
 <ul><li><code>ms.status(&amp;d)</code> returns a <code>vec.Vec&lt;migrate.Status&gt;</code> with <code>version</code>, <code>name</code> and <code>applied</code> for each migration. The vector is yours to free. The names are views of <code>ms</code>, so free <code>ms</code> after you are done with them.</li><li>A migration the database doesn't have yet shows as <code>pending</code>.</li></ul>
@@ -195,10 +193,10 @@ $ ./notes
     }
     <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
-<pre class="code"><code>$ ktm build
-$ rm -f notes.db
-$ ./notes
-up:      2 ran, version 2
+<pre class="code"><code>ktm build
+rm -f notes.db
+./notes</code></pre>
+<pre class="out"><code>up:      2 ran, version 2
 down:    1 ran, version 1
 to 2:    1 ran, version 2
 to 0:    2 ran, version 0
@@ -263,12 +261,12 @@ to 7:    migrate: there is no migration 7</code></pre>
     <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
 <p><code>migrateDb</code> prints only when something ran, so a normal start is quiet. When a migration fails the program stops, instead of running against a schema it doesn't expect.</p>
-<pre class="code"><code>$ ktm build
-$ ./notes
-3 migration(s) applied, version 3
-$ sqlite3 notes.db &quot;INSERT INTO notes (title) VALUES (&#x27;buy milk&#x27;), (&#x27;call ann&#x27;), (&#x27;fix the bike&#x27;)&quot;
-$ ./notes
-  1   buy milk
+<pre class="code"><code>ktm build
+./notes</code></pre>
+<pre class="out"><code>3 migration(s) applied, version 3</code></pre>
+<pre class="code"><code>sqlite3 notes.db &quot;INSERT INTO notes (title) VALUES (&#x27;buy milk&#x27;), (&#x27;call ann&#x27;), (&#x27;fix the bike&#x27;)&quot;
+./notes</code></pre>
+<pre class="out"><code>  1   buy milk
   2   call ann
   3   fix the bike</code></pre>
 <p>The last section left the database at version 0, so the first start applied all three. A copy of the program whose database is at version 2 applies only <code>add_pinned</code> on its next start.</p>
@@ -311,17 +309,17 @@ ALTER TABLE notes_new RENAME TO notes;
 PRAGMA foreign_key_check;
 COMMIT;
 PRAGMA foreign_keys = ON;</code></pre>
-<pre class="code"><code>$ sqlite3 notes.db &quot;UPDATE notes SET pinned = 1 WHERE id = 2&quot;
-$ sqlite3 notes.db &quot;INSERT INTO tags VALUES (2, &#x27;family&#x27;)&quot;
-$ ./notes
-1 migration(s) applied, version 4
+<pre class="code"><code>sqlite3 notes.db &quot;UPDATE notes SET pinned = 1 WHERE id = 2&quot;
+sqlite3 notes.db &quot;INSERT INTO tags VALUES (2, &#x27;family&#x27;)&quot;
+./notes</code></pre>
+<pre class="out"><code>1 migration(s) applied, version 4
   2 * call ann
   1   buy milk
-  3   fix the bike
-$ sqlite3 notes.db &quot;SELECT * FROM tags&quot;
-2|family
-$ sqlite3 notes.db &quot;INSERT INTO notes (title) VALUES (&#x27;$(printf &#x27;x%.0s&#x27; $(seq 1 201))&#x27;)&quot;
-Error: stepping, CHECK constraint failed: length(title) &lt;= 200 (19)</code></pre>
+  3   fix the bike</code></pre>
+<pre class="code"><code>sqlite3 notes.db &quot;SELECT * FROM tags&quot;</code></pre>
+<pre class="out"><code>2|family</code></pre>
+<pre class="code"><code>sqlite3 notes.db &quot;INSERT INTO notes (title) VALUES (&#x27;$(printf &#x27;x%.0s&#x27; $(seq 1 201))&#x27;)&quot;</code></pre>
+<pre class="out"><code>Error: stepping, CHECK constraint failed: length(title) &lt;= 200 (19)</code></pre>
 <p>The notes, the pin and the tag survived: with foreign keys on, <code>DROP TABLE notes</code> would have deleted every tag. The new table has the limit.</p>
 <ul><li>The marker must be the first line of the script, exactly <code>-- migrate: no-transaction</code> (whitespace around it doesn't matter).</li><li>Without the runner's transaction, the script and its row in <code>schema_migrations</code> are no longer one step. Give the script its own <code>BEGIN</code> and <code>COMMIT</code> whenever it can have them, as this one does.</li><li>When a no-transaction script fails, the error ends in <code>(it ran without a transaction: what ran before the error stays)</code>. Here everything after <code>BEGIN</code> is undone when the program closes the database without a <code>COMMIT</code>. The migration stays pending, so it can run again once the data is fixed.</li></ul>
 <h2 id="when-a-migration-fails"><a href="#when-a-migration-fails">When a migration fails</a></h2>
@@ -330,16 +328,15 @@ Error: stepping, CHECK constraint failed: length(title) &lt;= 200 (19)</code></p
 <pre class="code"><code>CREATE TABLE notebooks (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
 ALTER TABLE notes ADD COLUMN notebook_id INTEGER REFERENCES notebook (id);
 INSERT INTO notebook (name) VALUES (&#x27;inbox&#x27;);</code></pre>
-<pre class="code"><code>$ ./notes
-migrate: 5_add_notebooks.up.sql: no such table: notebook
-$ sqlite3 notes.db &quot;SELECT version, name FROM schema_migrations&quot;
-1|create_notes
+<pre class="code"><code>./notes</code></pre>
+<pre class="out"><code>migrate: 5_add_notebooks.up.sql: no such table: notebook</code></pre>
+<pre class="code"><code>sqlite3 notes.db &quot;SELECT version, name FROM schema_migrations&quot;</code></pre>
+<pre class="out"><code>1|create_notes
 2|create_tags
 3|add_pinned
-4|title_limit
-$ sqlite3 notes.db &quot;SELECT name FROM sqlite_master WHERE name = &#x27;notebooks&#x27;&quot;
-$</code></pre>
-<p>Version 5 isn't recorded, and the <code>notebooks</code> table its first statement made is gone too, since the whole migration was one transaction. The program stopped before listing anything. Fix the file and start it again. The file name in the message is built from the version number, so <code>005_add_notebooks</code> shows as <code>5_add_notebooks</code>.</p>
+4|title_limit</code></pre>
+<pre class="code"><code>sqlite3 notes.db &quot;SELECT name FROM sqlite_master WHERE name = &#x27;notebooks&#x27;&quot;</code></pre>
+<p>The last query prints nothing. Version 5 isn't recorded, and the <code>notebooks</code> table its first statement made is gone too, since the whole migration was one transaction. The program stopped before listing anything. Fix the file and start it again. The file name in the message is built from the version number, so <code>005_add_notebooks</code> shows as <code>5_add_notebooks</code>.</p>
 <p>To act on the failure in code, catch the error and look at its code:</p>
 <pre class="code"><code><span class="k">try</span> {
     ms.up(&amp;d);
@@ -375,10 +372,10 @@ $</code></pre>
     t.equal(migrate.version(&amp;d), <span class="n">0</span>);
     t.equal(ms.up(&amp;d), all);
 }</code></pre>
-<pre class="code"><code>$ ktm test
-ok  	.	0.00s  (1 passed)
-$ ktm test -jit -Memsafe
-ok  	.	0.00s  (1 passed)</code></pre>
+<pre class="code"><code>ktm test</code></pre>
+<pre class="out"><code>ok  	.	0.00s  (1 passed)</code></pre>
+<pre class="code"><code>ktm test -jit -Memsafe</code></pre>
+<pre class="out"><code>ok  	.	0.00s  (1 passed)</code></pre>
 <p><code>ms.items</code> is the <code>vec.Vec&lt;migrate.Migration&gt;</code> that <code>load</code> filled, so <code>ms.items.len</code> is how many there are. A down script with a mistake fails the test and names the file:</p>
 <pre class="out"><code>--- FAIL: testMigrationsRoundTrip (0.00s)
     migrate.ktm:275: threw 1835466753: migrate: 2_create_tags.down.sql: no such table: tagz
@@ -423,20 +420,17 @@ FAIL</code></pre>
     printf(<span class="s">&quot;%d migration(s) applied, version %d\n&quot;</span>, ms.up(&amp;d), migrate.version(&amp;d));
     <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
-<pre class="code"><code>$ ktm run .
-3 migration(s) applied, version 3</code></pre>
+<pre class="code"><code>ktm run .</code></pre>
+<pre class="out"><code>3 migration(s) applied, version 3</code></pre>
 <ul><li><code>ms.add</code> may be called in any order; the migrations are kept sorted by version.</li><li>The down script may be left out (<code>ms.add(4, &quot;seed&quot;, &quot;INSERT ...&quot;)</code>), and so may an empty one. That migration then can't be reverted.</li><li><code>ms.add</code> throws <code>migrate.ERR_MIGRATE</code> for a version below 1, a name with other characters, or a version that is already there.</li><li>A <code>migrate.Migrations</code> declared like this starts empty. Free it with <code>ms.free()</code> the same way.</li><li>The <code>-- migrate: no-transaction</code> marker works the same in code.</li></ul>
 <h2 id="postgresql"><a href="#postgresql">PostgreSQL</a></h2>
 <p>The same program on PostgreSQL needs ktm-pg too, since <code>main</code> imports it directly. It works on any ktm; SQLite isn't needed.</p>
-<pre class="code"><code>$ mkdir notes &amp;&amp; cd notes
-$ ktm mod init example.com/me/notes
-ktm: created ktm.mod for example.com/me/notes
-$ ktm get github.com/ozzenerol/ktm-migrate
-ktm: added github.com/ozzenerol/ktm-migrate v0.1.1
-$ ktm get github.com/ozzenerol/ktm-pg
-ktm: added github.com/ozzenerol/ktm-pg v0.2.1
-$ cat ktm.mod
-module example.com/me/notes
+<pre class="code"><code>mkdir notes &amp;&amp; cd notes
+ktm mod init example.com/me/notes
+ktm get github.com/ozzenerol/ktm-migrate
+ktm get github.com/ozzenerol/ktm-pg</code></pre>
+<p><code>ktm.mod</code> now requires both packages:</p>
+<pre class="code"><code>module example.com/me/notes
 
 ktm 0.25
 
@@ -498,22 +492,22 @@ DROP INDEX CONCURRENTLY IF EXISTS tags_by_tag;</code></pre>
     <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
 <p><code>pg.connect()</code> with no URL takes the server from <code>PGHOST</code>, <code>PGPORT</code>, <code>PGUSER</code>, <code>PGPASSWORD</code> and <code>PGDATABASE</code>. A URL works too: <code>pg.connect(&quot;postgres://ann:secret@localhost:5432/notes&quot;)</code>. It throws when it can't connect, so it goes inside the <code>try</code>.</p>
-<pre class="code"><code>$ export PGHOST=127.0.0.1 PGUSER=postgres PGPASSWORD=secret PGDATABASE=notes
-$ ktm build
-$ ./notes
-3 migration(s) applied, version 3
+<pre class="code"><code>export PGHOST=127.0.0.1 PGUSER=postgres PGPASSWORD=secret PGDATABASE=notes
+ktm build
+./notes</code></pre>
+<pre class="out"><code>3 migration(s) applied, version 3
    1  applied  create_notes
    2  applied  create_tags
-   3  applied  index_tags
-$ ./notes
-0 migration(s) applied, version 3
+   3  applied  index_tags</code></pre>
+<pre class="code"><code>./notes</code></pre>
+<pre class="out"><code>0 migration(s) applied, version 3
    1  applied  create_notes
    2  applied  create_tags
-   3  applied  index_tags
-$ PGPASSWORD=wrong ./notes
-pg: FATAL: password authentication failed for user &quot;postgres&quot; (SQLSTATE 28P01)
-$ psql -c &#x27;SELECT * FROM schema_migrations&#x27;
- version |     name     |         applied_at
+   3  applied  index_tags</code></pre>
+<pre class="code"><code>PGPASSWORD=wrong ./notes</code></pre>
+<pre class="out"><code>pg: FATAL: password authentication failed for user &quot;postgres&quot; (SQLSTATE 28P01)</code></pre>
+<pre class="code"><code>psql -c &#x27;SELECT * FROM schema_migrations&#x27;</code></pre>
+<pre class="out"><code> version |     name     |         applied_at
 ---------+--------------+----------------------------
        1 | create_notes | 2026-10-16 02:09:08.072007
        2 | create_tags  | 2026-10-16 02:09:08.073708
@@ -554,8 +548,8 @@ $ psql -c &#x27;SELECT * FROM schema_migrations&#x27;
 <p>Two copies of a program that start together, such as two containers of one service, must not both apply the same migration. Each driver has a lock for that:</p>
 <ul><li><strong>SQLite:</strong> each migration starts with <code>BEGIN IMMEDIATE</code>, which takes the database file's write lock. A second program waits for it, up to 10 seconds (the driver sets <code>busy_timeout</code> to 10000), then finds the migration already applied and skips it.</li><li><strong>PostgreSQL:</strong> the runner holds <code>pg_advisory_lock(postgres.LOCK_KEY)</code> for the whole call, so the instances take turns. The later ones find nothing left to do.</li><li>Inside each migration's transaction, the runner checks again whether the migration is applied. A migration never runs twice.</li></ul>
 <p>Two copies of the start-up program from <a href="#migrating-at-start-up">Migrating at start-up</a>, started together on a new SQLite file, with a migration that takes a few seconds:</p>
-<pre class="code"><code>$ ./notes &amp; ./notes
-4 migration(s) applied, version 4</code></pre>
+<pre class="code"><code>./notes &amp; ./notes</code></pre>
+<pre class="out"><code>4 migration(s) applied, version 4</code></pre>
 <p>One applied all four. The other waited for the lock, found nothing left, and printed nothing.</p>
 <p>On PostgreSQL there is a catch in ktm-migrate v0.1.1. When the pending migrations include a <code>CREATE INDEX CONCURRENTLY</code>, two instances that start together deadlock. <code>CREATE INDEX CONCURRENTLY</code> waits for every open transaction to end, including the other instance's query that is waiting for the lock. Postgres breaks the deadlock by failing the waiting instance:</p>
 <pre class="out"><code>deadlock detected (SQLSTATE 40P01); detail: Process 106 waits for ExclusiveLock on advisory lock [5,27508,1835886951,1]; blocked by process 105.</code></pre>
@@ -567,18 +561,18 @@ $ psql -c &#x27;SELECT * FROM schema_migrations&#x27;
   20261002090000_create_b.up.sql     from the branch merged last
   20261003090000_create_c.up.sql</code></pre>
 <p><code>up</code> applies every migration the database doesn't have, including one whose version is lower than the newest applied. With the program from <a href="#see-where-a-database-is">See where a database is</a>, before and after the merge brings <code>create_b</code> in:</p>
-<pre class="code"><code>$ ./notes
-2 migration(s) applied, version 20261003090000
+<pre class="code"><code>./notes</code></pre>
+<pre class="out"><code>2 migration(s) applied, version 20261003090000
 20261001090000  applied  create_a
-20261003090000  applied  create_c
-$ ./notes
-1 migration(s) applied, version 20261003090000
+20261003090000  applied  create_c</code></pre>
+<pre class="code"><code>./notes</code></pre>
+<pre class="out"><code>1 migration(s) applied, version 20261003090000
 20261001090000  applied  create_a
 20261002090000  applied  create_b
 20261003090000  applied  create_c</code></pre>
 <p>The other way round, a database can have a version this build doesn't know, because a newer build ran it. <code>status</code> lists it with an empty name:</p>
-<pre class="code"><code>$ ./notes
-0 migration(s) applied, version 5
+<pre class="code"><code>./notes</code></pre>
+<pre class="out"><code>0 migration(s) applied, version 5
    1  applied  create_notes
    2  applied  create_tags
    3  applied  add_pinned
@@ -652,8 +646,8 @@ migrate.Driver logged(migrate.Driver *inner) {
     ms.up(&amp;d);
     <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
-<pre class="code"><code>$ ktm run .
-lock
+<pre class="code"><code>ktm run .</code></pre>
+<pre class="out"><code>lock
 exec  CREATE TABLE IF NOT EXISTS schema_migrations (version bigint PRIMARY KEY, name text NOT NULL, applied_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP)
 query SELECT version FROM schema_migrations ORDER BY version
 exec  BEGIN IMMEDIATE

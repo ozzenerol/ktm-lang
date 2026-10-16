@@ -15,8 +15,8 @@ merged branches, and a driver of your own.
   its headers (`libsqlite3-dev` on Debian and Ubuntu; macOS has them):
 
 ```sh
-$ git clone https://github.com/ozzenerol/ktm-lang && cd ktm-lang
-$ ./build.sh --sqlite --install
+git clone https://github.com/ozzenerol/ktm-lang && cd ktm-lang
+./build.sh --sqlite --install
 ```
 
 - **For PostgreSQL, any ktm.** The driver uses the [ktm-pg](https://github.com/ozzenerol/ktm-pg)
@@ -43,12 +43,14 @@ Error: ktm-migrate/sqlite needs ktm built with SQLite (./build.sh --sqlite)
 ## Create the project
 
 ```sh
-$ mkdir notes && cd notes
-$ ktm mod init example.com/me/notes
-ktm: created ktm.mod for example.com/me/notes
-$ ktm get github.com/ozzenerol/ktm-migrate
-ktm: added github.com/ozzenerol/ktm-migrate v0.1.1
-$ cat ktm.mod
+mkdir notes && cd notes
+ktm mod init example.com/me/notes
+ktm get github.com/ozzenerol/ktm-migrate
+```
+
+`ktm.mod` now requires the package:
+
+```text
 module example.com/me/notes
 
 ktm 0.25
@@ -73,7 +75,7 @@ A package is only compiled when the program imports it. A SQLite program never b
 Migrations go in a directory of their own, `migrations/`. Make two: a table of notes and a table
 of tags.
 
-```sh
+```text
 notes/
   ktm.mod
   ktm.sum
@@ -159,10 +161,19 @@ i32 main() {
 ```
 
 ```sh
-$ ktm build
-$ ./notes
+ktm build
+./notes
+```
+
+```output
 2 migration(s) applied, version 2
-$ ./notes
+```
+
+```sh
+./notes
+```
+
+```output
 0 migration(s) applied, version 2
 ```
 
@@ -178,7 +189,10 @@ $ ./notes
 The `sqlite3` shell shows what happened:
 
 ```sh
-$ sqlite3 notes.db 'SELECT * FROM schema_migrations'
+sqlite3 notes.db 'SELECT * FROM schema_migrations'
+```
+
+```output
 1|create_notes|2026-10-16 01:58:02
 2|create_tags|2026-10-16 01:58:02
 ```
@@ -217,12 +231,21 @@ i32 main() {
 ```
 
 ```sh
-$ ktm build
-$ ./notes
+ktm build
+./notes
+```
+
+```output
 2 migration(s) applied, version 2
    1  applied  create_notes
    2  applied  create_tags
-$ ./notes
+```
+
+```sh
+./notes
+```
+
+```output
 0 migration(s) applied, version 2
    1  applied  create_notes
    2  applied  create_tags
@@ -277,9 +300,12 @@ i32 main() {
 ```
 
 ```sh
-$ ktm build
-$ rm -f notes.db
-$ ./notes
+ktm build
+rm -f notes.db
+./notes
+```
+
+```output
 up:      2 ran, version 2
 down:    1 ran, version 1
 to 2:    1 ran, version 2
@@ -379,11 +405,20 @@ i32 main() {
 the program stops, instead of running against a schema it doesn't expect.
 
 ```sh
-$ ktm build
-$ ./notes
+ktm build
+./notes
+```
+
+```output
 3 migration(s) applied, version 3
-$ sqlite3 notes.db "INSERT INTO notes (title) VALUES ('buy milk'), ('call ann'), ('fix the bike')"
-$ ./notes
+```
+
+```sh
+sqlite3 notes.db "INSERT INTO notes (title) VALUES ('buy milk'), ('call ann'), ('fix the bike')"
+./notes
+```
+
+```output
   1   buy milk
   2   call ann
   3   fix the bike
@@ -455,16 +490,31 @@ PRAGMA foreign_keys = ON;
 ```
 
 ```sh
-$ sqlite3 notes.db "UPDATE notes SET pinned = 1 WHERE id = 2"
-$ sqlite3 notes.db "INSERT INTO tags VALUES (2, 'family')"
-$ ./notes
+sqlite3 notes.db "UPDATE notes SET pinned = 1 WHERE id = 2"
+sqlite3 notes.db "INSERT INTO tags VALUES (2, 'family')"
+./notes
+```
+
+```output
 1 migration(s) applied, version 4
   2 * call ann
   1   buy milk
   3   fix the bike
-$ sqlite3 notes.db "SELECT * FROM tags"
+```
+
+```sh
+sqlite3 notes.db "SELECT * FROM tags"
+```
+
+```output
 2|family
-$ sqlite3 notes.db "INSERT INTO notes (title) VALUES ('$(printf 'x%.0s' $(seq 1 201))')"
+```
+
+```sh
+sqlite3 notes.db "INSERT INTO notes (title) VALUES ('$(printf 'x%.0s' $(seq 1 201))')"
+```
+
+```output
 Error: stepping, CHECK constraint failed: length(title) <= 200 (19)
 ```
 
@@ -495,18 +545,29 @@ INSERT INTO notebook (name) VALUES ('inbox');
 ```
 
 ```sh
-$ ./notes
+./notes
+```
+
+```output
 migrate: 5_add_notebooks.up.sql: no such table: notebook
-$ sqlite3 notes.db "SELECT version, name FROM schema_migrations"
+```
+
+```sh
+sqlite3 notes.db "SELECT version, name FROM schema_migrations"
+```
+
+```output
 1|create_notes
 2|create_tags
 3|add_pinned
 4|title_limit
-$ sqlite3 notes.db "SELECT name FROM sqlite_master WHERE name = 'notebooks'"
-$
 ```
 
-Version 5 isn't recorded, and the `notebooks` table its first statement made is gone too, since
+```sh
+sqlite3 notes.db "SELECT name FROM sqlite_master WHERE name = 'notebooks'"
+```
+
+The last query prints nothing. Version 5 isn't recorded, and the `notebooks` table its first statement made is gone too, since
 the whole migration was one transaction. The program stopped before listing anything. Fix the
 file and start it again. The file name in the message is built from the
 version number, so `005_add_notebooks` shows as `5_add_notebooks`.
@@ -571,9 +632,18 @@ void testMigrationsRoundTrip(testing.T *t) {
 ```
 
 ```sh
-$ ktm test
+ktm test
+```
+
+```output
 ok  	.	0.00s  (1 passed)
-$ ktm test -jit -Memsafe
+```
+
+```sh
+ktm test -jit -Memsafe
+```
+
+```output
 ok  	.	0.00s  (1 passed)
 ```
 
@@ -636,7 +706,10 @@ i32 main() {
 ```
 
 ```sh
-$ ktm run .
+ktm run .
+```
+
+```output
 3 migration(s) applied, version 3
 ```
 
@@ -654,14 +727,15 @@ The same program on PostgreSQL needs ktm-pg too, since `main` imports it directl
 any ktm; SQLite isn't needed.
 
 ```sh
-$ mkdir notes && cd notes
-$ ktm mod init example.com/me/notes
-ktm: created ktm.mod for example.com/me/notes
-$ ktm get github.com/ozzenerol/ktm-migrate
-ktm: added github.com/ozzenerol/ktm-migrate v0.1.1
-$ ktm get github.com/ozzenerol/ktm-pg
-ktm: added github.com/ozzenerol/ktm-pg v0.2.1
-$ cat ktm.mod
+mkdir notes && cd notes
+ktm mod init example.com/me/notes
+ktm get github.com/ozzenerol/ktm-migrate
+ktm get github.com/ozzenerol/ktm-pg
+```
+
+`ktm.mod` now requires both packages:
+
+```text
 module example.com/me/notes
 
 ktm 0.25
@@ -767,21 +841,42 @@ i32 main() {
 throws when it can't connect, so it goes inside the `try`.
 
 ```sh
-$ export PGHOST=127.0.0.1 PGUSER=postgres PGPASSWORD=secret PGDATABASE=notes
-$ ktm build
-$ ./notes
+export PGHOST=127.0.0.1 PGUSER=postgres PGPASSWORD=secret PGDATABASE=notes
+ktm build
+./notes
+```
+
+```output
 3 migration(s) applied, version 3
    1  applied  create_notes
    2  applied  create_tags
    3  applied  index_tags
-$ ./notes
+```
+
+```sh
+./notes
+```
+
+```output
 0 migration(s) applied, version 3
    1  applied  create_notes
    2  applied  create_tags
    3  applied  index_tags
-$ PGPASSWORD=wrong ./notes
+```
+
+```sh
+PGPASSWORD=wrong ./notes
+```
+
+```output
 pg: FATAL: password authentication failed for user "postgres" (SQLSTATE 28P01)
-$ psql -c 'SELECT * FROM schema_migrations'
+```
+
+```sh
+psql -c 'SELECT * FROM schema_migrations'
+```
+
+```output
  version |     name     |         applied_at
 ---------+--------------+----------------------------
        1 | create_notes | 2026-10-16 02:09:08.072007
@@ -852,7 +947,10 @@ Two copies of the start-up program from [Migrating at start-up](#migrating-at-st
 together on a new SQLite file, with a migration that takes a few seconds:
 
 ```sh
-$ ./notes & ./notes
+./notes & ./notes
+```
+
+```output
 4 migration(s) applied, version 4
 ```
 
@@ -877,7 +975,7 @@ Two people on two branches can each add a migration. Numbering them `003` on bot
 when the branches merge: `load` refuses a version with two names. Versions made from the time
 (`YYYYMMDDHHMMSS`) don't clash:
 
-```sh
+```text
 migrations/
   20261001090000_create_a.up.sql
   20261002090000_create_b.up.sql     from the branch merged last
@@ -889,11 +987,20 @@ than the newest applied. With the program from [See where a database is](#see-wh
 before and after the merge brings `create_b` in:
 
 ```sh
-$ ./notes
+./notes
+```
+
+```output
 2 migration(s) applied, version 20261003090000
 20261001090000  applied  create_a
 20261003090000  applied  create_c
-$ ./notes
+```
+
+```sh
+./notes
+```
+
+```output
 1 migration(s) applied, version 20261003090000
 20261001090000  applied  create_a
 20261002090000  applied  create_b
@@ -904,7 +1011,10 @@ The other way round, a database can have a version this build doesn't know, beca
 build ran it. `status` lists it with an empty name:
 
 ```sh
-$ ./notes
+./notes
+```
+
+```output
 0 migration(s) applied, version 5
    1  applied  create_notes
    2  applied  create_tags
@@ -1001,7 +1111,10 @@ i32 main() {
 ```
 
 ```sh
-$ ktm run .
+ktm run .
+```
+
+```output
 lock
 exec  CREATE TABLE IF NOT EXISTS schema_migrations (version bigint PRIMARY KEY, name text NOT NULL, applied_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP)
 query SELECT version FROM schema_migrations ORDER BY version

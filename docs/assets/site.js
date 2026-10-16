@@ -84,15 +84,27 @@
     });
   }
 
-  document.querySelectorAll("button.copy").forEach(function (b) {
+  /* A Copy button copies el's text, or selects it when the clipboard is out of reach */
+  function copyOnClick(b, el) {
     b.addEventListener("click", function () {
-      var el = document.getElementById(b.getAttribute("data-copy"));
       var text = el ? el.textContent : "";
       function done() { b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1500); }
       function select() { var r = document.createRange(); r.selectNodeContents(el); var s = getSelection(); s.removeAllRanges(); s.addRange(r); }
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, select);
       else select();
     });
+  }
+  document.querySelectorAll("button.copy").forEach(function (b) {
+    copyOnClick(b, document.getElementById(b.getAttribute("data-copy")));
+  });
+  /* and every code block of a page has one */
+  document.querySelectorAll(".prose pre.code:not(.bad)").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.className = "copy copy-code";
+    b.type = "button";
+    b.textContent = "Copy";
+    pre.appendChild(b);
+    copyOnClick(b, pre.querySelector("code"));
   });
 
   /* "On this page": the section being read */
