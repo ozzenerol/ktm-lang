@@ -933,6 +933,28 @@ static const char *lspSkipSpace(const char *p, const char *end) {
  * the first non-zero return of fn and returns it. */
 typedef int LspImportFn(const char *path, size_t path_len, const char *prefix,
                         size_t prefix_len, void *arg);
+
+/* The server's state, for the helpers below that only get a document's
+ * text: the packages the compiler has seen */
+static LspCtx *lsp_server = NULL;
+
+/* A package import `import "github.com/u/repo";` (or `x = "..."`): the
+ * path the compiler qualifies its names with ("github_com.u.repo..."),
+ * and its name in the code, the package's `module` line, in *_name
+ * (NULL when the compiler hasn't read that package) */
+static char *lspPackageImport(const char *quoted, size_t len, char **_name) {
+    if (!lsp_server || !lsp_server->cc) return NULL;
+    Cctrl *cc = lsp_server->cc;
+    for (int k = 0; k < cc->packages_len; ++k) {
+        CctrlPackage *p = &cc->packages[k];
+        if (strlen(p->package) == len && !memcmp(p->package, quoted, len)) {
+            *_name = pkgModuleName(p->dir);
+            return *_name ? p->module_path : NULL;
+        }
+    }
+    return NULL;
+}
+
 static int lspEachImport(AoStr *text, LspImportFn *fn, void *arg) {
     const char *s = text->data, *end = s + text->len;
     while (s < end) {
@@ -949,6 +971,25 @@ static int lspEachImport(AoStr *text, LspImportFn *fn, void *arg) {
                 while (nw < 2) {
                     p = lspSkipSpace(p, end);
                     if (p < end && *p == '=') { alias = 1; p++; continue; }
+                    if (p < end && *p == '"') {
+                        /* a package: `import "path"` or `import x = "path"` */
+                        const char *q = memchr(p + 1, '"', end - p - 1);
+                        if (!q) break;
+                        char *name = NULL;
+                        char *mpath = lspPackageImport(p + 1, q - p - 1, &name);
+                        p = q + 1;
+                        if (mpath && (nw == 0 || alias)) {
+                            const char *prefix = nw == 1 ? w[0] : name;
+                            size_t prefix_len = nw == 1 ? wl[0] : strlen(name);
+                            int r = fn(mpath, strlen(mpath), prefix, prefix_len, arg);
+                            free(name);
+                            if (r) return r;
+                        } else {
+                            free(name);
+                        }
+                        nw = -1;
+                        break;
+                    }
                     const char *q = p;
                     while (q < end && (lspIsIdentChar(*q) || *q == '.')) q++;
                     if (q == p) break;
@@ -961,7 +1002,9 @@ static int lspEachImport(AoStr *text, LspImportFn *fn, void *arg) {
                         if (n >= end || *n != '=') break;
                     }
                 }
-                if (nw >= 1) {
+                if (nw < 0) {
+                    /* a package import, handled above */
+                } else if (nw >= 1) {
                     int aliased = alias && nw == 2;
                     const char *path = aliased ? w[1] : w[0];
                     size_t path_len = aliased ? wl[1] : wl[0];
@@ -1615,6 +1658,36 @@ typedef struct LspLoc {
 static int lspLocate(LspCtx *ctx, const char *uri, AoStr *text, int line,
                      int character, LspLoc *loc);
 
+/* `text` with each package's qualified names as the code writes them:
+ * "github_com.u.ktm_pg.pg.Conn" -> "pg.Conn" (a new AoStr) */
+static AoStr *lspPackageNamesShown(LspCtx *ctx, AoStr *text) {
+    AoStr *out = aoStrDupRaw(text->data, text->len);
+    for (int k = 0; k < ctx->cc->packages_len; ++k) {
+        CctrlPackage *p = &ctx->cc->packages[k];
+        char *name = pkgModuleName(p->dir);
+        if (!name) continue;
+        size_t plen = strlen(p->module_path), nlen = strlen(name);
+        /* the module path ends in the module's name: keep that part */
+        if (plen > nlen + 1 && !strcmp(p->module_path + plen - nlen, name) &&
+            p->module_path[plen - nlen - 1] == '.')
+        {
+            size_t cut = plen - nlen;      /* "github_com.u.ktm_pg." */
+            AoStr *next = aoStrNew();
+            const char *s = out->data, *end = out->data + out->len;
+            while (s < end) {
+                const char *hit = strstr(s, p->module_path);
+                if (!hit || hit >= end) { aoStrCatLen(next, s, end - s); break; }
+                aoStrCatLen(next, s, hit - s);
+                s = hit + cut;
+            }
+            aoStrRelease(out);
+            out = next;
+        }
+        free(name);
+    }
+    return out;
+}
+
 static void lspHover(LspCtx *ctx, Json *id, Json *params) {
     const char *uri;
     int line, character;
@@ -1737,7 +1810,9 @@ static void lspHover(LspCtx *ctx, Json *id, Json *params) {
     AoStr *result = aoStrNew();
     aoStrCatPrintf(result,
                    "{\"contents\":{\"kind\":\"markdown\",\"value\":\"");
-    AoStr *md = aoStrPrintf("```ktm\n%s\n```", rendered->data);
+    AoStr *shown = lspPackageNamesShown(ctx, rendered);
+    AoStr *md = aoStrPrintf("```ktm\n%s\n```", shown->data);
+    aoStrRelease(shown);
     LspLoc loc;
     if (lspLocate(ctx, uri, text, line, character, &loc) && loc.line > 0) {
         const char *def_uri = NULL;
@@ -3160,6 +3235,19 @@ static void lspModuleDefinition(LspCtx *ctx, Json *id, const char *modname) {
  * (an absolute path), 1-based line and column (0: none) and the name's
  * length. 0 when it isn't known. Module names are left to the caller. */
 
+/* Is the identifier at (line, character) followed by `<`: a generic's
+ * type arguments, as in `vec.new<i64>()`? */
+static int lspGenericArgsAt(AoStr *text, int line, int character) {
+    const char *s = text->data;
+    size_t n = text->len, i = 0;
+    for (int l = 0; l < line && i < n; ++i) {
+        if (s[i] == '\n') l++;
+    }
+    i += (size_t)character;
+    while (i < n && lspIsIdentChar(s[i])) i++;
+    return i < n && s[i] == '<';
+}
+
 static int lspLocate(LspCtx *ctx, const char *uri, AoStr *text, int line,
                      int character, LspLoc *loc) {
     char ident[256];
@@ -3208,8 +3296,11 @@ static int lspLocate(LspCtx *ctx, const char *uri, AoStr *text, int line,
         def_col = emember->col;
         def_file = emember->file_id;
     } else if (qual) {
-        /* `prefix.name`: the module's declaration, in its own file */
-        Ast *entry = lspModuleValue(ctx, qual);
+        /* `prefix.name`: the module's declaration, in its own file; a
+         * generic's (`vec.new<i64>`, `pg.queryAll<T>`) when type
+         * arguments follow, or when nothing else has the name */
+        GenericDef *gen = lspGeneric(ctx, qual, strlen(qual));
+        Ast *entry = gen && lspGenericArgsAt(text, line, character) ? NULL : lspModuleValue(ctx, qual);
         AstType *ty = entry ? NULL : mapGet(ctx->cc->clsdefs, qual);
         if (!entry && !ty) ty = mapGet(ctx->cc->uniondefs, qual);
         is_member = 1;
@@ -3225,6 +3316,10 @@ static int lspLocate(LspCtx *ctx, const char *uri, AoStr *text, int line,
             def_line = ty->line;
             def_col = ty->col;
             def_file = ty->file_id;
+        } else if (gen && gen->at) {
+            def_line = gen->at->line;
+            def_col = gen->at->col;
+            def_file = gen->file_id;
         }
     } else {
         mcls = lspMemberClassAt(ctx, text, doc_id, line, character,
@@ -3365,8 +3460,13 @@ static void lspDefinition(LspCtx *ctx, Json *id, Json *params) {
     AoStr *result = aoStrNew();
     const char *def_uri = NULL;
     AoStr *def_text = lspTextForPath(ctx, loc.path, &def_uri);
+    /* a package's files through a replace are "app/../pkg/x.ktm": the
+     * editor gets the real path, so it shows the file it already has */
+    char *real = realpath(loc.path, NULL);
+    const char *shown = real ? real : loc.path;
     aoStrCatPrintf(result, "{\"uri\":\"file://");
-    jsonEscapeInto(result, loc.path, strlen(loc.path));
+    jsonEscapeInto(result, shown, strlen(shown));
+    free(real);
     aoStrCatLen(result, "\",", 2);
     lspCatRange(ctx, result, def_text, loc.line - 1, c0, c1);
     aoStrPutChar(result, '}');
@@ -5616,6 +5716,7 @@ int lspRun(CliArgs *args) {
     ctx->pending = vecNew(&vec_cstring_owned_type);
     ctx->stale = vecNew(&vec_cstring_owned_type);
     ctx->cc = lspFreshCctrl(ctx);
+    lsp_server = ctx;
     lspInstallCrashHandlers();
     /* The debounce poll()s fd 0; an stdio read-ahead buffer would make
      * poll block on data the process already holds. Unbuffered stdin
