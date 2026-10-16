@@ -1,7 +1,7 @@
 #ifndef VERSION__
 #define VERSION__
 
-#define KTM_VERSION ("v0.27.1")
+#define KTM_VERSION ("v0.28.0")
 
 static inline const char *cctrlGetVersion(void) {
     return KTM_VERSION;
