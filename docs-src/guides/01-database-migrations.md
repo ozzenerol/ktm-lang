@@ -11,12 +11,13 @@ merged branches, and a driver of your own.
 
 - **ktm 0.24 or newer.** ktm-migrate v0.1.1 needs it.
 - **For SQLite, a ktm built with SQLite.** The `sql` module, which the SQLite driver uses, is only
-  in a ktm built from source with `--sqlite`. The release zips don't have it. You need sqlite3 and
-  its headers (`libsqlite3-dev` on Debian and Ubuntu; macOS has them):
+  in a ktm built from source, which links SQLite by default (older versions needed
+  `--sqlite`). The release zips don't have it. You need sqlite3 and its headers (`libsqlite3-dev`
+  on Debian and Ubuntu; macOS has them):
 
 ```sh
 git clone https://github.com/ozzenerol/ktm-lang && cd ktm-lang
-./build.sh --sqlite --install
+./build.sh --install
 ```
 
 - **For PostgreSQL, any ktm.** The driver uses the [ktm-pg](https://github.com/ozzenerol/ktm-pg)

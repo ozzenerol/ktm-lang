@@ -55,7 +55,7 @@
       {"name": "net.https", "title": "HTTPS", "summary": "https:// for the HTTP client and TLS for servers."}
     ]},
     {"title": "Databases", "modules": [
-      {"name": "sql", "title": "SQLite", "summary": "SQLite: queries with arguments, rows into structs, prepared statements (ktm built with --sqlite)."}
+      {"name": "sql", "title": "SQLite", "summary": "SQLite: queries with arguments, rows into structs, prepared statements (ktm built from source with SQLite, the default)."}
     ]}
   ]
 }

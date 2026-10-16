@@ -40,9 +40,9 @@
 <h1>SQLite</h1>
 <p class="lede">Keep a program's data in one file with SQLite, through the standard library's <code>sql</code> module. This guide builds up a small catalogue of books, one whole program at a time: creating a table, statements with arguments, reading rows into structs, NULLs, errors, transactions, the settings a real program wants, enums, blobs and JSON columns, tests on a database in memory, and prepared statements for the fastest bulk inserts.</p>
 <h2 id="what-you-need"><a href="#what-you-need">What you need</a></h2>
-<p>ktm v0.26.0 or newer, built with SQLite. The <code>sql</code> module is only in a ktm built from source with <code>--sqlite</code>, which the release zips are not. That needs sqlite3 and its headers (<code>libsqlite3-dev</code> on Debian and Ubuntu; macOS has them):</p>
+<p>ktm v0.26.0 or newer, built with SQLite. The <code>sql</code> module is only in a ktm built from source, which links SQLite by default (older versions needed <code>--sqlite</code>). The release zips don't have it. That needs sqlite3 and its headers (<code>libsqlite3-dev</code> on Debian and Ubuntu; macOS has them):</p>
 <pre class="code"><code>git clone https://github.com/ozzenerol/ktm-lang &amp;&amp; cd ktm-lang
-./build.sh --sqlite --install</code></pre>
+./build.sh --install</code></pre>
 <p>On a ktm built without it, <code>import sql;</code> still compiles but the module is empty, so the first use of it fails:</p>
 <pre class="out"><code>error: Variable or function `sql.Db` has not been defined</code></pre>
 <p>Every program in this guide is one file, <code>app.ktm</code>, in a directory of its own. Each one works on <code>books.db</code> in that directory, and each step carries on from the database the last one left, so run them in order. Build and run each one like this:</p>

@@ -1,7 +1,7 @@
 # SQLite
 
-The `sql` module is SQLite. It is only in a ktm built with `./build.sh --sqlite`; the release
-zips don't have it.
+The `sql` module is SQLite. It is in a ktm built from source with `./build.sh`, which links
+SQLite unless you pass `--no-sqlite`; the release zips don't have it.
 
 Most programs need four calls: `db.exec` for a statement, `sql.queryAll<T>` and
 `sql.queryOne<T>` to read rows into structs, and `sql.free` for what they allocated. Each `?` takes

@@ -8,13 +8,13 @@ statements for the fastest bulk inserts.
 
 ## What you need
 
-ktm v0.26.0 or newer, built with SQLite. The `sql` module is only in a ktm built from source with
-`--sqlite`, which the release zips are not. That needs sqlite3 and its headers (`libsqlite3-dev` on
-Debian and Ubuntu; macOS has them):
+ktm v0.26.0 or newer, built with SQLite. The `sql` module is only in a ktm built from source, which
+links SQLite by default (older versions needed `--sqlite`). The release zips don't have it.
+That needs sqlite3 and its headers (`libsqlite3-dev` on Debian and Ubuntu; macOS has them):
 
 ```sh
 git clone https://github.com/ozzenerol/ktm-lang && cd ktm-lang
-./build.sh --sqlite --install
+./build.sh --install
 ```
 
 On a ktm built without it, `import sql;` still compiles but the module is empty, so the first use

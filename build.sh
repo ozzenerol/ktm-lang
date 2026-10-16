@@ -5,13 +5,14 @@
 # Everything is built into a local prefix (./build/prefix) so nothing in
 # /usr/local is touched or relied upon.
 #
-# Usage: ./build.sh [--debug] [--sqlite] [--test] [--install] [--clean]
-#   --debug    Debug build instead of Release
-#   --sqlite   Link libktm against sqlite3
-#   --test     Run unit, JIT and LSP tests after building
-#   --install  Also install ktm + libktm into $INSTALL_PREFIX (default
-#              /usr/local), using sudo for the copy only if needed
-#   --clean    Remove ./build and ./ktm before building
+# Usage: ./build.sh [--debug] [--no-sqlite] [--test] [--install] [--clean]
+#   --debug      Debug build instead of Release
+#   --no-sqlite  Build libktm without sqlite3 (no sql module); by default
+#                it is linked against sqlite3 (--sqlite is still accepted)
+#   --test       Run unit, JIT and LSP tests after building
+#   --install    Also install ktm + libktm into $INSTALL_PREFIX (default
+#                /usr/local), using sudo for the copy only if needed
+#   --clean      Remove ./build and ./ktm before building
 #
 # Run as your normal user, not with sudo.
 #
@@ -27,7 +28,7 @@ JOBS="${JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)}"
 INSTALL_PREFIX="${INSTALL_PREFIX:-/usr/local}"
 
 BUILD_TYPE=Release
-SQLITE=0
+SQLITE=1
 RUN_TESTS=0
 DO_INSTALL=0
 DO_CLEAN=0
@@ -38,6 +39,7 @@ for arg in "$@"; do
     case "$arg" in
         --debug)   BUILD_TYPE=Debug ;;
         --sqlite)  SQLITE=1 ;;
+        --no-sqlite) SQLITE=0 ;;
         --test)    RUN_TESTS=1 ;;
         --install) DO_INSTALL=1 ;;
         --clean)   DO_CLEAN=1 ;;
