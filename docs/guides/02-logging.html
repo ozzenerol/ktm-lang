@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Logging - ktm</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body class="wide">
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="../index.html">ktm</a>
+    <nav class="main">
+      <a href="../language/index.html">Language</a>
+      <a href="../guides/index.html" class="on">Quick Guides</a>
+      <a href="../std/index.html">Library</a>
+      <a href="../releases.html">Releases</a>
+    </nav>
+    <div class="search" data-root="../">
+      <input id="site-search" type="search" placeholder="Search" aria-label="Search the documentation" autocomplete="off">
+      <kbd>/</kbd>
+      <ul id="site-results" class="results" hidden></ul>
+    </div>
+    <span class="ver">v0.25.0</span>
+    <button id="theme" class="theme" aria-label="Switch between light and dark">&#9680;</button>
+  </div>
+</header>
+<div class="doc">
+  <aside class="chapters" aria-label="Chapters"><h4>Quick Guides</h4><ol><li><a href="01-database-migrations.html"><span class="num">1</span>Database migrations</a></li><li><a href="02-logging.html" class="on"><span class="num">2</span>Logging</a></li></ol></aside>
+  <article class="prose">
+<h1>Logging</h1>
+<p>Write what a program does to stderr, to stdout or to a file, with the standard library's <code>log</code> module. This guide starts with one line and adds a step at a time: levels, a level from the environment, a log file, where each line came from, rotation, a second log of your own, threads, and the access log of an HTTP server. Every step is a whole program you can build and run.</p>
+<h2 id="what-you-need"><a href="#what-you-need">What you need</a></h2>
+<p>Any ktm. <code>log</code> is part of the standard library, so there is nothing to fetch. Every program in this guide is one file, <code>app.ktm</code>, built and run like this:</p>
+<pre class="code"><code>ktm app.ktm -o app
+./app</code></pre>
+<p>The times in the outputs below are the ones from the runs that made this guide. Yours are the time you run it.</p>
+<h2 id="the-first-lines"><a href="#the-first-lines">The first lines</a></h2>
+<pre class="code"><code><span class="k">import</span> log;
+
+<span class="t">i32</span> main() {
+    log.info(<span class="s">&quot;starting, version %s&quot;</span>, <span class="s">&quot;1.4.0&quot;</span>);
+    log.debug(<span class="s">&quot;this line is not written: debug is below the default level&quot;</span>);
+    log.warn(<span class="s">&quot;disk %d%% full&quot;</span>, <span class="n">91</span>);
+    log.error(<span class="s">&quot;can&#x27;t reach %s: %s&quot;</span>, <span class="s">&quot;db.internal:5432&quot;</span>, <span class="s">&quot;connection refused&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm app.ktm -o app
+./app</code></pre>
+<pre class="out"><code>2026-10-16T02:23:59.539Z INFO  starting, version 1.4.0
+2026-10-16T02:23:59.539Z WARN  disk 91% full
+2026-10-16T02:23:59.539Z ERROR can&#x27;t reach db.internal:5432: connection refused</code></pre>
+<ul><li>Each call writes one line: the time, the level, then the message.</li><li>The time is UTC, with milliseconds, so lines from machines in different time zones sort together.</li><li>The message is formatted like <code>printf</code>: <code>%s</code>, <code>%d</code>, <code>%%</code> for a percent sign, and the rest.</li><li><code>log.debug</code> wrote nothing. The default level is <code>info</code>, and a logger writes its level and the ones above it: <code>debug</code> &lt; <code>info</code> &lt; <code>warn</code> &lt; <code>error</code>.</li><li><code>log.info</code> and the others work without any set-up. Until you set the log up, they write to stderr.</li></ul>
+<p>The lines go to stderr, so they stay out of what the program prints on stdout. The shell sends them wherever you want:</p>
+<pre class="code"><code>./app 2&gt; app.err
+cat app.err</code></pre>
+<pre class="out"><code>2026-10-16T02:23:59.541Z INFO  starting, version 1.4.0
+2026-10-16T02:23:59.541Z WARN  disk 91% full
+2026-10-16T02:23:59.541Z ERROR can&#x27;t reach db.internal:5432: connection refused</code></pre>
+<h2 id="levels"><a href="#levels">Levels</a></h2>
+<p>Use <code>debug</code> for detail you need only while hunting a bug, <code>info</code> for what the program is doing, <code>warn</code> for something wrong that it got past, and <code>error</code> for something it couldn't do. <code>log.setLevel</code> changes which of them are written. A common way to choose is an environment variable, so the same build can be quiet in production and chatty while you look into a problem:</p>
+<pre class="code"><code><span class="k">import</span> log, proc, str;
+
+<span class="c">/* The level LOG_LEVEL names (debug, info, warn or error); info when it is
+ * unset or something else */</span>
+log.Level levelFromEnv() {
+    <span class="k">scoped</span> <span class="t">String</span> v = proc.getenv(<span class="s">&quot;LOG_LEVEL&quot;</span>);
+    <span class="k">if</span> (str.equals(v[<span class="n">0</span>:], <span class="s">&quot;debug&quot;</span>)) { <span class="k">return</span> log.Level.debug; }
+    <span class="k">if</span> (str.equals(v[<span class="n">0</span>:], <span class="s">&quot;warn&quot;</span>)) { <span class="k">return</span> log.Level.warn; }
+    <span class="k">if</span> (str.equals(v[<span class="n">0</span>:], <span class="s">&quot;error&quot;</span>)) { <span class="k">return</span> log.Level.error; }
+    <span class="k">return</span> log.Level.info;
+}
+
+<span class="t">i32</span> main() {
+    log.setLevel(levelFromEnv());
+    log.debug(<span class="s">&quot;config loaded from %s&quot;</span>, <span class="s">&quot;/etc/app.conf&quot;</span>);
+    log.info(<span class="s">&quot;starting&quot;</span>);
+    log.warn(<span class="s">&quot;cache is cold&quot;</span>);
+    log.error(<span class="s">&quot;payment provider timed out&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm app.ktm -o app
+./app</code></pre>
+<pre class="out"><code>2026-10-16T02:24:08.546Z INFO  starting
+2026-10-16T02:24:08.546Z WARN  cache is cold
+2026-10-16T02:24:08.546Z ERROR payment provider timed out</code></pre>
+<pre class="code"><code>LOG_LEVEL=debug ./app</code></pre>
+<pre class="out"><code>2026-10-16T02:24:08.547Z DEBUG config loaded from /etc/app.conf
+2026-10-16T02:24:08.547Z INFO  starting
+2026-10-16T02:24:08.547Z WARN  cache is cold
+2026-10-16T02:24:08.547Z ERROR payment provider timed out</code></pre>
+<pre class="code"><code>LOG_LEVEL=error ./app</code></pre>
+<pre class="out"><code>2026-10-16T02:24:08.548Z ERROR payment provider timed out</code></pre>
+<ul><li><code>log.Level</code> is an enum: <code>log.Level.debug</code>, <code>log.Level.info</code>, <code>log.Level.warn</code>, <code>log.Level.error</code>.</li><li><code>log.setLevel</code> takes effect for the calls after it, and can be called at any time.</li><li><code>error</code> lines are always written, whatever the level.</li><li>A call below the level returns before it formats anything, so <code>debug</code> lines cost almost nothing when they are off.</li></ul>
+<h2 id="logging-to-a-file"><a href="#logging-to-a-file">Logging to a file</a></h2>
+<p><code>log.setup</code> sets the default logger up from a <code>log.Options</code>: the one <code>log.info</code> and the others write to. Start from <code>log.options()</code>, which holds the defaults, and change what you need. Here the lines go to a file, with the file, line and function of each call:</p>
+<pre class="code"><code><span class="k">import</span> log;
+
+<span class="t">void</span> loadConfig() {
+    log.info(<span class="s">&quot;config loaded&quot;</span>);
+}
+
+<span class="t">void</span> connect(<span class="t">u8</span> *host) {
+    log.warn(<span class="s">&quot;%s is slow to answer&quot;</span>, host);
+}
+
+<span class="t">i32</span> main() {
+    log.Options o = log.options();
+    o.path = <span class="s">&quot;app.log&quot;</span>;
+    o.showFile = <span class="k">true</span>;
+    o.showFunc = <span class="k">true</span>;
+    log.setup(&amp;o);
+    <span class="k">defer</span> log.shutdown();
+
+    log.info(<span class="s">&quot;starting&quot;</span>);
+    loadConfig();
+    connect(<span class="s">&quot;db.internal&quot;</span>);
+    log.error(<span class="s">&quot;query failed:\nSELECT * FROM users\nno such table: users&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm app.ktm -o app
+./app
+cat app.log</code></pre>
+<pre class="out"><code>2026-10-16T02:24:13.683Z INFO  app.ktm:19 main:    starting
+2026-10-16T02:24:13.684Z INFO  app.ktm:4 loadConfig: config loaded
+2026-10-16T02:24:13.684Z WARN  app.ktm:8 connect:    db.internal is slow to answer
+2026-10-16T02:24:13.684Z ERROR app.ktm:22 main:      query failed:\nSELECT * FROM users\nno such table: users</code></pre>
+<ul><li><code>o.path</code> is the file. It is created when it isn't there, and appended to when it is, so the next run adds its lines after these.</li><li><code>o.showFile</code> adds the call's file name and line, and <code>o.showFunc</code> the function it is in. The compiler fills them in for each call; there is nothing to pass.</li><li>The messages start in one column. That column is as wide as the widest file and function part so far (20 characters at least), so it can move right once, as it did after <code>loadConfig</code>.</li><li>A message is always one line. A newline inside it is written as <code>\n</code> and a carriage return as <code>\r</code>, so every line of the file starts with a time and a level, and tools that read the log a line at a time see one entry per line.</li><li><code>log.setup</code> copies what it needs from the Options, so <code>o</code> can go away after the call.</li><li><code>defer log.shutdown();</code> closes the file when <code>main</code> returns. The <a href="#shutting-down">next section but one</a> says where it must go.</li></ul>
+<h2 id="stdout-for-containers"><a href="#stdout-for-containers">Stdout, for containers</a></h2>
+<p>Docker, Kubernetes and systemd collect what a program writes to stdout and stderr. A program run by one of them usually logs to stdout and has no file. <code>o.toStdout</code> without a path does that:</p>
+<pre class="code"><code><span class="k">import</span> log;
+
+<span class="t">i32</span> main() {
+    log.Options o = log.options();
+    o.toStdout = <span class="k">true</span>;
+    log.setup(&amp;o);
+    <span class="k">defer</span> log.shutdown();
+
+    log.info(<span class="s">&quot;to stdout, for a container or a service manager to collect&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm app.ktm -o app
+./app</code></pre>
+<pre class="out"><code>2026-10-16T02:25:08.605Z INFO  to stdout, for a container or a service manager to collect</code></pre>
+<p>With a path as well, every line goes to the file and to stdout:</p>
+<pre class="code"><code><span class="k">import</span> log;
+
+<span class="t">i32</span> main() {
+    log.Options o = log.options();
+    o.path = <span class="s">&quot;app.log&quot;</span>;
+    o.toStdout = <span class="k">true</span>;
+    log.setup(&amp;o);
+    <span class="k">defer</span> log.shutdown();
+
+    log.info(<span class="s">&quot;written to app.log and to stdout&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm app.ktm -o app
+./app
+cat app.log</code></pre>
+<pre class="out"><code>2026-10-16T02:24:20.965Z INFO  written to app.log and to stdout
+2026-10-16T02:24:20.965Z INFO  written to app.log and to stdout</code></pre>
+<p>The first line is the one on stdout, the second the one <code>cat</code> shows from the file. A program that also prints with <code>printf</code> keeps its output and its log lines in the order it wrote them.</p>
+<h2 id="shutting-down"><a href="#shutting-down">Shutting down</a></h2>
+<p><code>log.shutdown()</code> closes the default logger. After it, <code>log.info</code> and the others write to stderr again, at the level the closed one had. Defer it in <code>main</code>, so it runs when the program ends. Deferred anywhere else, it runs too early:</p>
+<pre class="code"><code><span class="k">import</span> log;
+
+<span class="t">void</span> work() {
+    log.Options o = log.options();
+    o.path = <span class="s">&quot;app.log&quot;</span>;
+    log.setup(&amp;o);
+    <span class="k">defer</span> log.shutdown();
+    log.info(<span class="s">&quot;working&quot;</span>);
+}
+
+<span class="t">i32</span> main() {
+    work();
+    log.info(<span class="s">&quot;done&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm app.ktm -o app
+./app
+cat app.log</code></pre>
+<pre class="out"><code>log: a line logged after log.shutdown() at app.ktm:13 goes to stderr (was the shutdown deferred in an inner block?)
+2026-10-16T02:24:21.020Z INFO  done
+2026-10-16T02:24:21.020Z INFO  working</code></pre>
+<p>The shutdown ran when <code>work</code> returned, so <code>done</code> went to stderr instead of <code>app.log</code>. The first line after a shutdown says where it came from, once. Move <code>log.setup</code> and the deferred <code>log.shutdown</code> into <code>main</code> to fix it.</p>
+<ul><li>Calling <code>log.setup</code> again closes the logger set up before and opens the new one.</li><li><code>log.shutdown</code> with no logger set up does nothing.</li></ul>
+<h2 id="when-the-file-can-t-be-opened"><a href="#when-the-file-can-t-be-opened">When the file can't be opened</a></h2>
+<p><code>log.setup</code> throws <code>log.ERR_LOG</code> when it can't open the file, with the reason. The logger that was there before stays, so a program can say what went wrong and keep going on stderr:</p>
+<pre class="code"><code><span class="k">import</span> log;
+
+<span class="t">i32</span> main() {
+    log.Options o = log.options();
+    o.path = <span class="s">&quot;/var/log/app/app.log&quot;</span>;
+    <span class="k">try</span> {
+        log.setup(&amp;o);
+    } <span class="k">catch</span> (<span class="t">Error</span> e) {
+        log.error(<span class="s">&quot;%s; logging to stderr&quot;</span>, e.message);
+    }
+    log.info(<span class="s">&quot;starting&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm app.ktm -o app
+./app</code></pre>
+<pre class="out"><code>2026-10-16T02:24:21.080Z ERROR log.open: can&#x27;t open /var/log/app/app.log: No such file or directory; logging to stderr
+2026-10-16T02:24:21.080Z INFO  starting</code></pre>
+<p>The log module doesn't make directories. Make <code>/var/log/app</code> when the program is installed, owned by the user it runs as. Without the <code>try</code>, the error stops the program at start-up with an <code>uncaught error</code> report, which is also a fine choice for a service that must have its log.</p>
+<p>A write that fails later, on a full disk for example, doesn't stop the program either. The line is dropped and counted in the logger's <code>failed</code> field: <code>log.logger().failed</code>.</p>
+<h2 id="rotation"><a href="#rotation">Rotation</a></h2>
+<p>A log file of a program that runs for months grows without end. <code>o.maxBytes</code> starts a new file before a line would take the current one past that size, and <code>o.keep</code> says how many old files to keep:</p>
+<pre class="code"><code><span class="k">import</span> log;
+
+<span class="t">i32</span> main() {
+    log.Options o = log.options();
+    o.path = <span class="s">&quot;app.log&quot;</span>;
+    o.maxBytes = <span class="n">1000</span>;   <span class="c">/* small, to see it rotate: use megabytes for real */</span>
+    o.keep = <span class="n">3</span>;
+    log.setup(&amp;o);
+    <span class="k">defer</span> log.shutdown();
+
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">1</span>; i &lt;= <span class="n">100</span>; i++) {
+        log.info(<span class="s">&quot;request %d done&quot;</span>, i);
+    }
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm app.ktm -o app
+./app
+wc -c app.log*</code></pre>
+<pre class="out"><code> 753 app.log
+ 987 app.log.1
+ 987 app.log.2
+ 987 app.log.3
+3714 total</code></pre>
+<pre class="code"><code>head -1 app.log.3
+tail -1 app.log</code></pre>
+<pre class="out"><code>2026-10-16T02:24:25.721Z INFO  request 22 done
+2026-10-16T02:24:25.721Z INFO  request 100 done</code></pre>
+<ul><li><code>app.log</code> is always the newest. When it is full it becomes <code>app.log.1</code>, <code>app.log.1</code> becomes <code>app.log.2</code>, and so on. The file past <code>keep</code> is deleted: requests 1 to 21 are gone.</li><li>A line is never split between two files, and a file only goes over <code>maxBytes</code> when a single line is bigger than that.</li><li>With <code>keep</code> 0, the file is emptied and started again instead.</li><li><code>maxBytes</code> 0, the default, never rotates. Use it when something else rotates the file, such as logrotate.</li><li>Pick sizes for the disk you have: <code>o.maxBytes = 50 * 1024 * 1024; o.keep = 5;</code> keeps at most 300 MB.</li></ul>
+<h2 id="a-logger-of-your-own"><a href="#a-logger-of-your-own">A logger of your own</a></h2>
+<p>Some lines belong in a log of their own: an audit trail of money moving, a slow-query log. <code>log.open</code> makes a separate <code>log.Logger</code> from the same Options. Its methods are the same four calls:</p>
+<pre class="code"><code><span class="k">import</span> log;
+
+<span class="c">/* Code that takes the Logger to write to */</span>
+<span class="t">void</span> transfer(log.Logger *audit, <span class="t">u8</span> *from, <span class="t">u8</span> *to, <span class="t">i64</span> cents) {
+    log.debug(<span class="s">&quot;transfer %s -&gt; %s&quot;</span>, from, to);
+    audit.info(<span class="s">&quot;transfer from=%s to=%s cents=%d&quot;</span>, from, to, cents);
+}
+
+<span class="t">i32</span> main() {
+    log.Options o = log.options();
+    o.path = <span class="s">&quot;audit.log&quot;</span>;
+    log.Logger *audit = log.open(&amp;o);
+    <span class="k">defer</span> audit.close();
+
+    log.info(<span class="s">&quot;starting&quot;</span>);
+    transfer(audit, <span class="s">&quot;ann&quot;</span>, <span class="s">&quot;bob&quot;</span>, <span class="n">2500</span>);
+    transfer(audit, <span class="s">&quot;bob&quot;</span>, <span class="s">&quot;cat&quot;</span>, <span class="n">120</span>);
+    transfer(log.logger(), <span class="s">&quot;dan&quot;</span>, <span class="s">&quot;eve&quot;</span>, <span class="n">990</span>);   <span class="c">/* the default logger: stderr */</span>
+
+    audit.level = log.Level.warn;
+    transfer(audit, <span class="s">&quot;cat&quot;</span>, <span class="s">&quot;ann&quot;</span>, <span class="n">75</span>);      <span class="c">/* below warn: not in audit.log */</span>
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm app.ktm -o app
+./app</code></pre>
+<pre class="out"><code>2026-10-16T02:25:07.408Z INFO  starting
+2026-10-16T02:25:07.408Z INFO  transfer from=dan to=eve cents=990</code></pre>
+<pre class="code"><code>cat audit.log</code></pre>
+<pre class="out"><code>2026-10-16T02:25:07.408Z INFO  transfer from=ann to=bob cents=2500
+2026-10-16T02:25:07.408Z INFO  transfer from=bob to=cat cents=120</code></pre>
+<ul><li><code>log.open(&amp;o)</code> returns a <code>log.Logger *</code>. Close it with <code>close()</code>, which closes the file and frees the logger. It throws <code>log.ERR_LOG</code> like <code>log.setup</code> when the file can't be opened.</li><li>A Logger has its own level: <code>audit.level = log.Level.warn;</code>. After that line the third transfer, an <code>info</code> line, wasn't written.</li><li><code>log.logger()</code> is the default logger as a <code>log.Logger *</code>. Code that takes a Logger can be given either one: the <code>dan</code> transfer went to stderr.</li><li><code>transfer</code>'s <code>log.debug</code> line wasn't written either: the default logger is at <code>info</code>.</li></ul>
+<h2 id="threads"><a href="#threads">Threads</a></h2>
+<p>Several threads can share one logger. Set <code>o.threadSafe</code> on it:</p>
+<pre class="code"><code><span class="k">import</span> log, thread;
+
+<span class="k">struct</span> Job {
+    <span class="t">i64</span> id;
+};
+
+<span class="t">void</span> worker(Job *job) {
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">1</span>; i &lt;= <span class="n">10000</span>; i++) {
+        log.info(<span class="s">&quot;worker %d: item %d&quot;</span>, job.id, i);
+    }
+}
+
+<span class="t">i32</span> main() {
+    log.Options o = log.options();
+    o.path = <span class="s">&quot;app.log&quot;</span>;
+    o.threadSafe = <span class="k">true</span>;
+    log.setup(&amp;o);
+    <span class="k">defer</span> log.shutdown();
+
+    Job jobs[<span class="n">4</span>];
+    thread.Thread threads[<span class="n">4</span>];
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">4</span>; i++) {
+        jobs[i].id = i + <span class="n">1</span>;
+        threads[i] = thread.spawn(&amp;worker, &amp;jobs[i]);
+    }
+    <span class="k">for</span> (<span class="t">i64</span> i = <span class="n">0</span>; i &lt; <span class="n">4</span>; i++) {
+        threads[i].join();
+    }
+    log.info(<span class="s">&quot;all workers done&quot;</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+<pre class="code"><code>ktm app.ktm -o app
+./app
+wc -l app.log
+tail -1 app.log</code></pre>
+<pre class="out"><code>40001 app.log
+2026-10-16T02:24:40.138Z INFO  all workers done</code></pre>
+<ul><li><code>o.threadSafe</code> puts a lock around each line: the time, rotation and the write. Without it, two threads can rotate the file at once or miscount its size.</li><li>Each line is written whole, in one write, so lines from different threads never mix characters. Their order is the order the threads got the lock.</li><li>The lock is only taken for a line that is written. A <code>debug</code> line below the level costs no lock.</li></ul>
+<h2 id="an-http-server-s-access-log"><a href="#an-http-server-s-access-log">An HTTP server's access log</a></h2>
+<p><code>net.http</code> writes through the default logger. <code>accessLog</code> in the server's Options adds an <code>info</code> line per request, and a handler that throws is logged as an <code>error</code>. The server answers on several threads, so the logger is thread safe:</p>
+<pre class="code"><code><span class="k">import</span> log, net.http;
+
+<span class="k">const</span> <span class="t">i64</span> ERR_NO_USER = <span class="n">1</span>;
+
+<span class="t">void</span> hello(http.Writer *w, http.Request *r) {
+    <span class="t">u8</span>[] name = r.query(<span class="s">&quot;name&quot;</span>);
+    <span class="k">if</span> (!name.len) { name = <span class="s">&quot;world&quot;</span>; }
+    w.text(<span class="n">200</span>, <span class="s">&quot;hello, %s\n&quot;</span>, name);
+}
+
+<span class="t">void</span> order(http.Writer *w, http.Request *r) {
+    log.warn(<span class="s">&quot;order %s: payment declined&quot;</span>, r.param(<span class="s">&quot;id&quot;</span>));
+    w.text(<span class="n">402</span>, <span class="s">&quot;payment declined\n&quot;</span>);
+}
+
+<span class="t">void</span> crash(http.Writer *w, http.Request *r) {
+    <span class="k">throw</span>(ERR_NO_USER, <span class="s">&quot;no user %s&quot;</span>, r.param(<span class="s">&quot;id&quot;</span>));
+}
+
+<span class="t">i32</span> main() {
+    log.Options lo = log.options();
+    lo.path = <span class="s">&quot;access.log&quot;</span>;
+    lo.threadSafe = <span class="k">true</span>;      <span class="c">/* the server answers on several threads */</span>
+    log.setup(&amp;lo);
+    <span class="k">defer</span> log.shutdown();
+
+    http.Mux mux;
+    mux.handle(<span class="s">&quot;GET /hello&quot;</span>, &amp;hello);
+    mux.handle(<span class="s">&quot;POST /orders/{id}&quot;</span>, &amp;order);
+    mux.handle(<span class="s">&quot;GET /users/{id}&quot;</span>, &amp;crash);
+
+    http.Options o;
+    o.accessLog = <span class="k">true</span>;
+    log.info(<span class="s">&quot;listening on :8080&quot;</span>);
+    <span class="k">return</span> http.listen(<span class="n">8080</span>, &amp;mux, <span class="k">null</span>, &amp;o);
+}</code></pre>
+<p>Run it and send it a few requests from a second terminal:</p>
+<pre class="code"><code>ktm app.ktm -o app
+./app</code></pre>
+<pre class="code"><code>curl &#x27;localhost:8080/hello?name=ada&#x27;
+curl -X POST localhost:8080/orders/17
+curl localhost:8080/users/7
+curl localhost:8080/nope</code></pre>
+<p>Stop the server with Ctrl+C, then read the log:</p>
+<pre class="code"><code>cat access.log</code></pre>
+<pre class="out"><code>2026-10-16T02:25:07.492Z INFO  listening on :8080
+2026-10-16T02:25:07.998Z INFO  GET /hello?name=ada 200 11 0.006ms
+2026-10-16T02:25:08.004Z WARN  order 17: payment declined
+2026-10-16T02:25:08.004Z INFO  POST /orders/17 402 17 0.012ms
+2026-10-16T02:25:08.010Z ERROR http: GET /users/7: the handler threw 0x1 at app.ktm:17: no user 7
+2026-10-16T02:25:08.010Z INFO  GET /users/7 500 33 0.020ms
+2026-10-16T02:25:08.016Z INFO  GET /nope 404 21 0.003ms</code></pre>
+<ul><li>An access line is the method, the path with its query, the status, the body's size in bytes, and how long the handler took.</li><li>The access line is written when the request is done, so a handler's own lines come before it.</li><li>A handler that throws gets a 500 for the client and an <code>error</code> line with the code, the place and the message for you.</li><li>Ctrl+C (SIGINT) and SIGTERM stop the server: <code>http.listen</code> returns, and the deferred <code>log.shutdown()</code> closes the file.</li></ul>
+<h2 id="reference"><a href="#reference">Reference</a></h2>
+<div class="table"><table><thead><tr><th>Call</th><th>What it does</th></tr></thead><tbody><tr><td><code>log.debug(fmt, ...)</code>, <code>log.info</code>, <code>log.warn</code>, <code>log.error</code></td><td>one line on the default logger, formatted like <code>printf</code></td></tr><tr><td><code>log.setLevel(level)</code></td><td>the default logger's level, for the calls from now on</td></tr><tr><td><code>log.options()</code></td><td>Options with the defaults: stderr, <code>info</code>, no file or function, no rotation</td></tr><tr><td><code>log.setup(&amp;o)</code></td><td>sets the default logger up from <code>o</code>; closes the one before; throws <code>log.ERR_LOG</code></td></tr><tr><td><code>log.shutdown()</code></td><td>closes the default logger; later lines go to stderr</td></tr><tr><td><code>log.logger()</code></td><td>the default logger, as a <code>log.Logger *</code></td></tr><tr><td><code>log.open(&amp;o)</code></td><td>a Logger of its own; throws <code>log.ERR_LOG</code></td></tr><tr><td><code>lg.debug(fmt, ...)</code>, <code>lg.info</code>, <code>lg.warn</code>, <code>lg.error</code></td><td>one line on that logger</td></tr><tr><td><code>lg.close()</code></td><td>closes its file and frees it</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>Option</th><th>Default</th><th>What it does</th></tr></thead><tbody><tr><td><code>path</code></td><td><code>null</code></td><td>the file to append to; <code>null</code> writes to stderr</td></tr><tr><td><code>toStdout</code></td><td><code>false</code></td><td>stdout instead of stderr, or as well as the file</td></tr><tr><td><code>level</code></td><td><code>log.Level.info</code></td><td>the least important level written</td></tr><tr><td><code>showFile</code></td><td><code>false</code></td><td>the call's file name and line</td></tr><tr><td><code>showFunc</code></td><td><code>false</code></td><td>the function the call is in</td></tr><tr><td><code>maxBytes</code></td><td><code>0</code></td><td>rotate before the file would pass this size; <code>0</code> never</td></tr><tr><td><code>keep</code></td><td><code>0</code></td><td>how many rotated files to keep (<code>path.1</code> is the newest)</td></tr><tr><td><code>threadSafe</code></td><td><code>false</code></td><td>a lock around each line, for a logger threads share</td></tr></tbody></table></div>
+<p>A <code>log.Logger</code> has two fields to read: <code>level</code>, which can also be set, and <code>failed</code>, the lines a failed write dropped.</p>
+<h2 id="rules-of-thumb"><a href="#rules-of-thumb">Rules of thumb</a></h2>
+<ul><li>**Set the log up first thing in <code>main</code>, and defer <code>log.shutdown()</code> right after.** Lines logged before the set-up go to stderr.</li><li><strong>Log events, not every step.</strong> One <code>info</code> line per thing that happened (a request served, a job finished) reads well. Put the steps in between at <code>debug</code>.</li><li>**Put values in the message as <code>key=value</code>** (<code>transfer from=ann cents=2500</code>). Then <code>grep</code> finds them, and a log tool can split them into fields.</li><li><strong>Never log secrets.</strong> Passwords, tokens, keys and full card numbers stay out of the message.</li><li>**<code>error</code> means someone should look.** If nobody has to act, it is a <code>warn</code>.</li><li>**Set <code>threadSafe</code> whenever more than one thread logs**, which includes every <code>net.http</code> server.</li></ul>
+    <nav class="pager"><a class="prev" href="01-database-migrations.html"><span>Previous</span>Database migrations</a></nav>
+  </article>
+  <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#what-you-need">What you need</a></li><li><a href="#the-first-lines">The first lines</a></li><li><a href="#levels">Levels</a></li><li><a href="#logging-to-a-file">Logging to a file</a></li><li><a href="#stdout-for-containers">Stdout, for containers</a></li><li><a href="#shutting-down">Shutting down</a></li><li><a href="#when-the-file-can-t-be-opened">When the file can&#x27;t be opened</a></li><li><a href="#rotation">Rotation</a></li><li><a href="#a-logger-of-your-own">A logger of your own</a></li><li><a href="#threads">Threads</a></li><li><a href="#an-http-server-s-access-log">An HTTP server&#x27;s access log</a></li><li><a href="#reference">Reference</a></li><li><a href="#rules-of-thumb">Rules of thumb</a></li></ul></aside>
+</div>
+<footer>
+  <div class="bar">
+    <span>ktm v0.25.0</span>
+    <a href="../releases.html">Releases</a>
+    <a href="../known-issues.html">Known issues</a>
+    <a href="../roadmap.html">Roadmap</a>
+    <a href="https://github.com/ozzenerol/ktm-lang">GitHub</a>
+  </div>
+</footer>
+<script src="../assets/search.js"></script>
+<script src="../assets/site.js"></script>
+</body>
+</html>
