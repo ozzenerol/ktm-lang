@@ -7,7 +7,12 @@
 
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="../assets/style.css">
-<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script>try {
+  var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t;
+  ["chapters", "onpage", "std-left", "std-right"].forEach(function (s) {
+    if (localStorage.getItem("ktm-side-" + s) === "closed") document.documentElement.classList.add("closed-" + s);
+  });
+} catch (e) {}</script>
 </head>
 <body class="wide">
 <header class="top">
@@ -29,6 +34,7 @@
   </div>
 </header>
 <div class="doc">
+  <button class="side-toggle" type="button" data-side="chapters" data-text="Language" data-label="the chapter list" aria-expanded="true">&#8249; Language</button>
   <aside class="chapters" aria-label="Chapters"><h4>Language</h4><ol><li><a href="01-first-program.html"><span class="num">1</span>A first program</a></li><li><a href="02-types-and-values.html"><span class="num">2</span>Types and values</a></li><li><a href="03-variables.html"><span class="num">3</span>Variables</a></li><li><a href="04-operators.html"><span class="num">4</span>Operators</a></li><li><a href="05-control-flow.html"><span class="num">5</span>Control flow</a></li><li><a href="06-switch.html"><span class="num">6</span>switch</a></li><li><a href="07-functions.html"><span class="num">7</span>Functions</a></li><li><a href="08-pointers.html"><span class="num">8</span>Pointers</a></li><li><a href="09-memory.html"><span class="num">9</span>Memory</a></li><li><a href="10-arrays-and-slices.html"><span class="num">10</span>Arrays and slices</a></li><li><a href="11-strings.html"><span class="num">11</span>Strings</a></li><li><a href="12-structs-and-unions.html"><span class="num">12</span>Structs and unions</a></li><li><a href="13-methods.html"><span class="num">13</span>Methods</a></li><li><a href="14-enums.html"><span class="num">14</span>Enums</a></li><li><a href="15-errors.html"><span class="num">15</span>Errors</a></li><li><a href="16-defer-and-scoped.html"><span class="num">16</span>defer and scoped</a></li><li><a href="17-generics.html"><span class="num">17</span>Generics</a></li><li><a href="18-overloading.html"><span class="num">18</span>Overloading</a></li><li><a href="19-varargs.html"><span class="num">19</span>Variable arguments</a></li><li><a href="20-function-pointers.html"><span class="num">20</span>Function pointers</a></li><li><a href="21-type-aliases.html"><span class="num">21</span>Type aliases</a></li><li><a href="22-modules-and-packages.html"><span class="num">22</span>Modules and packages</a></li><li><a href="23-attributes.html"><span class="num">23</span>Attributes</a></li><li><a href="24-reflection.html"><span class="num">24</span>Reflection</a></li><li><a href="25-preprocessor.html"><span class="num">25</span>The preprocessor</a></li><li><a href="26-calling-c.html"><span class="num">26</span>Calling C</a></li><li><a href="27-threads-and-threadlocal.html" class="on"><span class="num">27</span>Threads and threadlocal</a></li><li><a href="28-inline-assembly.html"><span class="num">28</span>Inline assembly</a></li><li><a href="29-safety-and-debugging.html"><span class="num">29</span>Safety and debugging</a></li></ol></aside>
   <article class="prose">
 <h1>Threads and threadlocal</h1>
@@ -474,6 +480,7 @@ main: 1 calls, 0 errors</code></pre>
 <ul><li><code>thread.spawn(&amp;f, &amp;arg)</code> runs <code>f(&amp;arg)</code> on a new thread (<code>f</code> takes a pointer), and <code>thread.spawn(&amp;f)</code> a function with no argument; <code>join()</code> waits for it.</li><li>What a thread throws, <code>join()</code> throws in the thread that joins; <code>WaitGroup.wait()</code>, <code>thread.each</code> and <code>Pool.wait()</code> throw the first error their threads threw.</li><li><code>thread.go</code> with a <code>WaitGroup</code> starts threads to wait for together, <code>thread.each</code> runs a function over a slice on every core, a <code>Channel&lt;T&gt;</code> passes values between threads, and a <code>Pool</code> runs many small jobs on a few threads.</li><li>Threads share globals and the heap; protect shared changes with a <code>thread.Mutex</code>, or use <code>atomic</code> for a single integer. The module's locks need no setup and nothing to free; don't copy one that is in use.</li><li><code>threadlocal</code> on a global gives each thread its own copy, starting at the declared constant value.</li><li>Coroutines run inside a thread; see the <code>coro</code> module.</li><li>C's threads are there too, through <code>libc.pthread_*</code>.</li></ul>
     <nav class="pager"><a class="prev" href="26-calling-c.html"><span>Previous</span>Calling C</a><a class="next" href="28-inline-assembly.html"><span>Next</span>Inline assembly</a></nav>
   </article>
+  <button class="side-toggle side-toggle-r" type="button" data-side="onpage" data-text="On this page" data-label="on this page" aria-expanded="true">On this page &#8250;</button>
   <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#starting-a-thread">Starting a thread</a></li><li><a href="#many-threads-at-once">Many threads at once</a></li><li><a href="#errors-in-threads">Errors in threads</a></li><li><a href="#sharing-data">Sharing data</a></li><li><a href="#threadlocal">threadlocal</a></li><li><a href="#coroutines-in-brief">Coroutines in brief</a></li><li><a href="#c-threads">C threads</a></li><li><a href="#rules">Rules</a></li></ul></aside>
 </div>
 <footer>

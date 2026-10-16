@@ -7,7 +7,12 @@
 
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="../assets/style.css">
-<script>try { var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script>try {
+  var t = localStorage.getItem("ktm-theme"); if (t) document.documentElement.dataset.theme = t;
+  ["chapters", "onpage", "std-left", "std-right"].forEach(function (s) {
+    if (localStorage.getItem("ktm-side-" + s) === "closed") document.documentElement.classList.add("closed-" + s);
+  });
+} catch (e) {}</script>
 </head>
 <body class="wide">
 <header class="top">
@@ -29,6 +34,7 @@
   </div>
 </header>
 <div class="doc">
+  <button class="side-toggle" type="button" data-side="chapters" data-text="Quick Guides" data-label="the chapter list" aria-expanded="true">&#8249; Quick Guides</button>
   <aside class="chapters" aria-label="Chapters"><h4>Quick Guides</h4><ol><li><a href="01-database-migrations.html"><span class="num">1</span>Database migrations</a></li><li><a href="02-logging.html"><span class="num">2</span>Logging</a></li><li><a href="03-sqlite.html"><span class="num">3</span>SQLite</a></li><li><a href="04-postgresql.html" class="on"><span class="num">4</span>PostgreSQL</a></li><li><a href="05-flags.html"><span class="num">5</span>Command-line flags</a></li><li><a href="06-terminal-output.html"><span class="num">6</span>Terminal output</a></li></ol></aside>
   <article class="prose">
 <h1>PostgreSQL</h1>
@@ -496,6 +502,7 @@ no more for 1 s</code></pre>
 <ul><li>**Values go in <code>$1</code>, <code>$2</code> ..., never into the SQL text.**</li><li><strong>One pool per program</strong>, opened in <code>main</code> and checked with <code>ping()</code> before serving.</li><li>**<code>defer tx.rollback();</code> right after <code>begin()</code>**, and <code>commit()</code> at the end.</li><li><strong>Free scanned values</strong> with <code>pg.free(reflect.of(x))</code>, or scan into <code>pg.queryResult&lt;T&gt;</code> for big results (see the <a href="https://github.com/ozzenerol/ktm-pg#big-results-queryresult">README</a>).</li><li><strong>Set a query timeout</strong> on servers, so one slow query can't hold a request forever.</li><li><strong>Manage the schema with migrations</strong>: the <a href="01-database-migrations.html">database migrations guide</a> covers Postgres too.</li></ul>
     <nav class="pager"><a class="prev" href="03-sqlite.html"><span>Previous</span>SQLite</a><a class="next" href="05-flags.html"><span>Next</span>Command-line flags</a></nav>
   </article>
+  <button class="side-toggle side-toggle-r" type="button" data-side="onpage" data-text="On this page" data-label="on this page" aria-expanded="true">On this page &#8250;</button>
   <aside class="onpage" aria-label="On this page"><h4>On this page</h4><ul><li><a href="#what-you-need">What you need</a></li><li><a href="#connect-and-run-statements">Connect and run statements</a></li><li><a href="#read-rows-into-structs">Read rows into structs</a></li><li><a href="#rows-one-by-one">Rows one by one</a></li><li><a href="#transactions">Transactions</a></li><li><a href="#errors">Errors</a></li><li><a href="#a-pool-behind-an-http-api">A pool behind an HTTP API</a></li><li><a href="#batches-and-bulk-loading">Batches and bulk loading</a></li><li><a href="#query-timeouts">Query timeouts</a></li><li><a href="#listen-and-notify">LISTEN and NOTIFY</a></li><li><a href="#connecting-securely">Connecting securely</a></li><li><a href="#reference">Reference</a></li><li><a href="#rules-of-thumb">Rules of thumb</a></li></ul></aside>
 </div>
 <footer>

@@ -107,6 +107,37 @@
     copyOnClick(b, pre.querySelector("code"));
   });
 
+  /* closable sidebars: chapters, on this page, and the library's two panes.
+     the open/closed class lives on <html> (set early, in <head>, to avoid a layout
+     flash) and the CSS keys off it; this just keeps buttons and storage in sync. */
+  var SIDES = { chapters: "left", onpage: "right", "std-left": "left", "std-right": "right" };
+  function syncButtons(side, closed) {
+    var left = SIDES[side] === "left";
+    var open = left ? "‹" : "›";
+    var shut = left ? "›" : "‹";
+    document.querySelectorAll('.side-toggle[data-side="' + side + '"]').forEach(function (b) {
+      var icon = closed ? shut : open;
+      var text = b.getAttribute("data-text");
+      b.textContent = left ? icon + " " + text : text + " " + icon;
+      b.setAttribute("aria-expanded", String(!closed));
+      b.setAttribute("aria-label", (closed ? "Show " : "Hide ") + b.getAttribute("data-label"));
+    });
+  }
+  Object.keys(SIDES).forEach(function (side) {
+    var closed = document.documentElement.classList.contains("closed-" + side);
+    syncButtons(side, closed);
+  });
+  document.querySelectorAll(".side-toggle").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var side = b.getAttribute("data-side");
+      var cls = "closed-" + side;
+      var closed = !document.documentElement.classList.contains(cls);
+      document.documentElement.classList.toggle(cls, closed);
+      syncButtons(side, closed);
+      try { localStorage.setItem("ktm-side-" + side, closed ? "closed" : "open"); } catch (e) {}
+    });
+  });
+
   /* "On this page": the section being read */
   var links = document.querySelectorAll(".onpage a");
   if (links.length && "IntersectionObserver" in window) {
