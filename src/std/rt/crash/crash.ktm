@@ -574,6 +574,46 @@ static void crashUncaughtTrace(u64 fp) {
     }
 }
 
+/* The return addresses of the calls from fp up (at most max), for a
+ * throw that only defers stand above: printed by crashUncaughtRets once
+ * they ran (rt.ErrThrow) */
+static i64 crashUncaughtCapture(u64 fp, u64 *rets, i64 max) {
+    u64 prev = 0;
+    i64 n = 0;
+    while (n < max && fp) {
+        if ((fp & 7) || (prev && fp <= prev) || !crashReadable(fp)) { break; }
+        u64 ret = ((u64 *)fp)[1];
+        if (!ret) { break; }
+        rets[n++] = ret;
+        prev = fp;
+        fp = ((u64 *)fp)[0];
+    }
+    return n;
+}
+
+/* crashUncaughtTrace for the calls crashUncaughtCapture kept */
+static void crashUncaughtRets(u64 *rets, i64 n) {
+    bool skipping = true;
+    crashNextAt = true;
+    for (i64 i = 0; i < n; i++) {
+        if (skipping) {
+            CrashFn *f = crashFind(rets[i] - 1);
+            skipping = f && crashInRt(crashAt(&f.name));
+        }
+        if (!skipping) {
+            crashFrame(rets[i], false);
+            if (crashAtMain) { break; }
+        }
+    }
+    crashEndRepeat();
+    if (crashHidden) {
+        crashPut("  ... ");
+        crashPutDec(crashHidden);
+        crashPut(" more\n");
+        crashFlush();
+    }
+}
+
 /* Set the calling thread's signal stack (a stack_t: ss_sp, then
  * ss_flags and ss_size, whose order differs, at 8 or 16) */
 static void crashAltStack(u8 *stack, i32 flags) {
@@ -612,11 +652,17 @@ pub void __ktmCrashAdd(CrashFn *lo, CrashFn *hi) {
     /* libktm's records (the program's own when it is linked in): hand
      * rt the walker for uncaught errors */
     CrashFn *f;
-    for (f = lo; f < hi; f++) {
+    i64 found = 0;
+    for (f = lo; f < hi && found < 2; f++) {
         if (crashSame(crashAt(&f.name), "rt.__ktmUncaughtTraceSet")) {
             fn(fn(u64 fp) void trace) void set = (void *)crashStart(f);
             set(&crashUncaughtTrace);
-            return;
+            found++;
+        } else if (crashSame(crashAt(&f.name), "rt.__ktmUncaughtCaptureSet")) {
+            fn(fn(u64 fp, u64 *rets, i64 max) i64 capture,
+               fn(u64 *rets, i64 n) void print) void set = (void *)crashStart(f);
+            set(&crashUncaughtCapture, &crashUncaughtRets);
+            found++;
         }
     }
 }
